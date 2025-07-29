@@ -317,7 +317,6 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
         value={text}
         onChange={handleChange}
         onScroll={handleTextareaScroll}
-        onWheel={handleTextareaWheel}
         className={`absolute inset-0 w-full h-full p-4 resize-none outline-none text-sm leading-relaxed font-mono border-none focus:ring-0 z-10 bg-transparent dark:bg-gray-900 ${
           isDarkMode ? 'selection-dark' : 'selection-light'
         }`}
