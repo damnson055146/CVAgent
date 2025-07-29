@@ -1,43 +1,22 @@
 version: "3.8"
 
-
 services:
-  db:
-    image: postgres:15
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 13689282250
-      POSTGRES_DB: resumedb
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d resumedb"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend:
     environment:
-      - DATABASE_URL=postgresql://postgres:13689282250@db:5432/resumedb
+      - API_KEY=9589ca16aa2844de6975809fbac3891ef2a105eadcde6f56e044c60b6b774ec4
+      - DIFY_API_URL=http://47.93.166.93/v1/chat-messages
+      - DIFY_API_KEY_PARSE=app-vUxIgRioYdHMLHNXthPohBBY
+      - DIFY_API_KEY_REWRITE=app-NSMi2PZtYBCE9ITWSMPH7kml
+      - DIFY_API_KEY_EXPAND=app-WHKgL6UEpETSTjx1BkINhLlW
+      - DIFY_API_KEY_CONTRACT=app-TKSk1t6qRkCTFfPtwuyRbOuT
+      - DIFY_API_KEY_PROCESS_TEXT=app-yJ7LozBBr8NGN3e1Qi9YleAQ
+      - DIFY_API_KEY_PERSONAL_STATEMENT=app-0MxV1MnP63vkOhL8RhM2uL33
+      - DIFY_API_KEY_RECOMMENDATION=app-rdL3VKcnhQaKYkSPXXfRnXih
+      - DIFY_API_KEY_PROMPT_BASED=app-wXht7rntyPhIPrcvnshpJ3ba
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
       - "8699:8000"
     volumes:
       - ./:/app
-    # 可选：healthcheck 确保 DB 初始化完成再启动后端
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d resumedb -h db"]
-      interval: 5s
-      retries: 5
-
-volumes:
-  pgdata:

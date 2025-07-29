@@ -4,11 +4,10 @@ FROM python:3.11-slim
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖（如果需要额外库，可在此添加）
+# 安装系统依赖
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
          build-essential \
-         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 拷贝并安装 Python 依赖
@@ -21,7 +20,6 @@ COPY .env .
 # 拷贝应用代码
 COPY main.py .
 COPY app/ ./app
-COPY sql_postgre/ ./sql_postgre
 
 # 暴露容器内端口（与 Uvicorn 启动端口一致）
 EXPOSE 8000
