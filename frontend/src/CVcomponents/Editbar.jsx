@@ -246,6 +246,8 @@ export default function Editbar({
 
       {/* 历史记录面板 */}
       <HistoryPanel
+       className="w-8 h-6 text-gray-700 dark:text-white" 
+        title="历史记录" 
         isOpen={showHistoryPanel}
         onClose={() => setShowHistoryPanel(false)}
         onRestore={onRestoreHistory}
