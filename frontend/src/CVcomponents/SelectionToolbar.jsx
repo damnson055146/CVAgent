@@ -74,6 +74,13 @@ const SelectionToolbar = ({
     return '280px';
   };
 
+  // 计算工具栏高度
+  const getToolbarHeight = () => {
+    if (aiPreview) return '120px';
+    if (showPromptInput) return '180px'; // 增加高度以容纳选中文本显示
+    return '48px';
+  };
+
   return (
     <div
       ref={toolbarRef}
@@ -184,6 +191,16 @@ const SelectionToolbar = ({
       {/* 自定义提示输入区 */}
       {showPromptInput && (
         <div className="border-t border-gray-200 dark:border-gray-600 p-3">
+          {/* 选中文本显示区域 */}
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              选中文本：
+            </label>
+            <div className="w-full max-h-20 overflow-y-auto px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+              {selectedText}
+            </div>
+          </div>
+          
           <div className="mb-2">
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               自定义指令：

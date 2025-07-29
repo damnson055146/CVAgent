@@ -1,6 +1,6 @@
 // src/components/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, FileText, PenTool, MessageSquare, CheckCircle, GraduationCap, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, PenTool, MessageSquare, CheckCircle, GraduationCap, Clock, Home } from 'lucide-react';
 import Foldicon from './icons/Foldicon'; // 确保路径正确
 
 const Sidebar = ({ activeItem, onChange }) => {
@@ -24,12 +24,13 @@ const Sidebar = ({ activeItem, onChange }) => {
   };
 
   const menuItems = [
-    { icon: PenTool, label: '个人陈述', color: 'black' },
-    { icon: MessageSquare, label: '推荐信助手', color: 'black' },
-    { icon: FileText, label: '简历优化器', color: 'black' },
-    { icon: CheckCircle, label: '文书审核', color: 'black' },
-    { icon: GraduationCap, label: '院校匹配', color: 'black' },
-    { icon: Clock, label: '申请进度', color: 'black' },
+    { icon: Home, label: '首页', color: 'black', id: -1 },
+    { icon: PenTool, label: '个人陈述', color: 'black', id: 0 },
+    { icon: MessageSquare, label: '推荐信助手', color: 'black', id: 1 },
+    { icon: FileText, label: '简历优化器', color: 'black', id: 2 },
+    { icon: CheckCircle, label: '文书审核', color: 'black', id: 3 },
+    { icon: GraduationCap, label: '院校匹配', color: 'black', id: 4 },
+    { icon: Clock, label: '申请进度', color: 'black', id: 5 },
   ];
 
   return (
@@ -59,19 +60,19 @@ const Sidebar = ({ activeItem, onChange }) => {
             {menuItems.map((item, idx) => (
               <button
                 key={idx}
-                onClick={() => onChange(idx)}
-                className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 group relative ${isCollapsed ? 'justify-center' : 'justify-start space-x-3'} ${activeItem === idx
+                onClick={() => onChange(item.id)}
+                className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 group relative ${isCollapsed ? 'justify-center' : 'justify-start space-x-3'} ${activeItem === item.id
                     ? 'bg-blue-50 dark:bg-gray-700 text-yellow-700 dark:text-yellow-300 shadow-sm'
                     : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:shadow-sm'
                   }`}
               >
                 {/* 选中状态指示器 */}
-                {activeItem === idx && !isCollapsed && (
+                {activeItem === item.id && !isCollapsed && (
                   <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-gray-600 rounded-r-full" />
                 )}
 
                 <item.icon
-                  className={`w-5 h-5 transition-colors duration-200 ${activeItem === idx ? 'text-gray-600' : item.color
+                  className={`w-5 h-5 transition-colors duration-200 ${activeItem === item.id ? 'text-gray-600' : item.color
                     } ${isCollapsed ? '' : 'ml-2'}`}
                 />
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, forwardRef, useCallback } from 'react';
 import SelectionToolbar from '../CVcomponents/SelectionToolbar';
-import PreviewBox from '../CVcomponents/PreviewBox';
 import agentAPI from '../services/CVagentAPI';
 
 // 移除单词边界限制，允许任意选择
@@ -26,7 +25,6 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
   const [processingType, setProcessingType] = useState('');
   const [aiPreview, setAiPreview] = useState('');
   const [showPromptInput, setShowPromptInput] = useState(false);
-  const [showPreviewBox, setShowPreviewBox] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains('dark'));
   const selectionTimeoutRef = useRef(null);
 
@@ -64,7 +62,7 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
       toolbarHeight = 120;
     } else if (showPromptInput) {
       toolbarWidth = 400;
-      toolbarHeight = 120;
+      toolbarHeight = 180; // 增加高度以容纳选中文本显示
     }
     
     let y = spanRect.bottom + 8;
@@ -101,7 +99,6 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
 
   const cleanupState = useCallback(() => {
     setShowToolbar(false);
-    setShowPreviewBox(false);
     setAiPreview('');
     setShowPromptInput(false);
     setSelection({ start: 0, end: 0, text: '' });
@@ -131,7 +128,6 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
           const selectedText = textareaRef.current.value.substring(start, end);
           setSelection({ start, end, text: selectedText });
           setShowToolbar(true);
-          setShowPreviewBox(true);
         } else {
           if (!showPromptInput) {
             cleanupState();
@@ -359,21 +355,7 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
         </div>
       )}
       
-      {/* 预览框 */}
-      <PreviewBox
-        selectedText={selection.text}
-        aiPreview={aiPreview}
-        isVisible={showPreviewBox}
-        position={{
-          x: toolbarState.x + 340, // 在工具栏右侧显示
-          y: toolbarState.y,
-          arrowLeft: '50%'
-        }}
-        onAdopt={handleAdopt}
-        onCancel={() => setShowPreviewBox(false)}
-        isProcessing={isProcessing}
-        processingType={processingType}
-      />
+
       {isLoading && (
         <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center z-30">
           <div className="flex items-center space-x-2">

@@ -197,7 +197,7 @@ export default function Editbar({
         onClick={async () => {
           try {
             // 保存到后端并创建新版本
-            const saveResult = await agentAPI.saveResume(resumeData, content);
+            const saveResult = await agentAPI.saveResume(content);
             
             if (saveResult.id) {
               // 生成PDF
