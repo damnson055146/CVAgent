@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Send, FileText, Edit3, Loader2 } from 'lucide-react';
 import Styleswitch from '../Comcomponents/icons/Styleswitch';
 import ModelSelector from '../Comcomponents/common/ModelSelector';
-
+import { generatePersonalStatement } from '../services/PSagentAPI';
 // Button
 const Button = ({ children, type, size, className, onClick, disabled }) => {
   const baseClasses = "px-4 py-2 rounded font-medium transition-colors duration-200";
@@ -25,25 +25,6 @@ const PSGenerator = () => {
     const [inputText, setInputText] = useState('');
     const [generatedStatement, setGeneratedStatement] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-
-    // Mock generatePersonalStatement function
-    const generatePersonalStatement = async (text) => {
-        // Mock API call
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    个人陈述: {
-                        '开头与自我介绍与申请目标': '作为一名充满热情的学者，我怀着对知识的渴望和对未来的憧憬...',
-                        '科研经历': '在本科期间，我积极参与了多项科研项目，其中最具代表性的是...',
-                        '课外与领导': '除了学术追求，我还积极投身于各类课外活动和领导工作...',
-                        '职业规划': '通过深入的自我反思和对行业趋势的分析，我明确了自己的职业发展方向...',
-                        '择校理由': '贵校在相关领域的卓越声誉和前沿研究深深吸引着我...',
-                        '结尾': '综上所述，我坚信自己具备了在贵校继续深造的能力和决心...'
-                    }
-                });
-            }, 2000);
-        });
-    };
 
     const handleGenerate = async () => {
         if (!inputText.trim()) {

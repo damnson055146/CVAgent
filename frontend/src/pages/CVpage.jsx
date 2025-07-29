@@ -119,7 +119,7 @@ const CVPage = () => {
           alert(`简历测评结果：\n${result.processed_text}`);
           break;
         case 'polish':
-          result = await agentAPI.rewriteText(editContent);
+          result = await agentAPI.optimizeSelection(editContent);
           setEditContent(result.rewritten_text);
           setPreviewContent(result.rewritten_text);
           // 保存AI操作到历史记录
@@ -127,7 +127,7 @@ const CVPage = () => {
           saveHistoryItem(polishHistoryItem);
           break;
         case 'expand':
-          result = await agentAPI.expandText(editContent);
+          result = await agentAPI.expandSelection(editContent);
           setEditContent(result.expanded_text);
           setPreviewContent(result.expanded_text);
           // 保存AI操作到历史记录
@@ -135,7 +135,7 @@ const CVPage = () => {
           saveHistoryItem(expandHistoryItem);
           break;
         case 'contract':
-          result = await agentAPI.contractText(editContent);
+          result = await agentAPI.contractSelection(editContent);
           setEditContent(result.contracted_text);
           setPreviewContent(result.contracted_text);
           // 保存AI操作到历史记录
@@ -217,7 +217,7 @@ const CVPage = () => {
   }, [editContent, config, resumeData]);
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col h-full w-full">
       {/* 顶部导航栏 */}
       <header className="h-20 flex items-center px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 font-bold text-lg text-black-700 dark:text-white shadow-sm justify-between">
         <span>简历优化器</span>
@@ -250,8 +250,8 @@ const CVPage = () => {
       </div>
 
       {/* 编辑区 + 预览区 */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-2/5 h-full border-r border-gray-200 bg-white">
+      <div className="flex flex-1 overflow-hidden w-full" style={{ height: 'calc(100vh - 120px)' }}>
+        <div className="w-2/5 h-full border-r border-gray-200 dark:border-gray-700 bg-gray-900" style={{ backgroundColor: '#111827', minHeight: '100%' }}>
           <PreviewEditor content={editContent} onUpdate={handleRender} isLoading={isLoading} isMenuOpen={isMenuOpen} />
         </div>
         <div className="w-3/5 h-full overflow-auto bg-gray-50">

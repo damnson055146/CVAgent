@@ -1,6 +1,6 @@
 // src/services/RecagentAPI.jsx
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8699';
-const API_KEY = import.meta.env.VITE_API_KEY || '';
+const API_KEY = import.meta.env.VITE_API_KEY || '9589ca16aa2844de6975809fbac3891ef2a105eadcde6f56e044c60b6b774ec4';
 
 // 复用已有的请求头和响应处理
 const getHeaders = () => ({
@@ -18,7 +18,7 @@ const handleResponse = async (res) => {
 
 export const generateRec = async (inputText) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/generate_recommendation`, {
+    const res = await fetch(`${API_BASE_URL}/generate_recommendation/`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ text: inputText }),
