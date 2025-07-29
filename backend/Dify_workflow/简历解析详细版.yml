@@ -1,0 +1,199 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: advanced-chat
+  name: 简历解析详细版
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/siliconflow:0.0.18@959677bb0c4753407cd1143d5e1548b8de416eb5b38993fcf4630b79d9033e2e
+kind: app
+version: 0.3.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_size_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        sourceType: start
+        targetType: llm
+      id: 1752784900813-llm
+      source: '1752784900813'
+      sourceHandle: source
+      target: llm
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: llm-answer
+      source: llm
+      sourceHandle: source
+      target: answer
+      targetHandle: target
+      type: custom
+    nodes:
+    - data:
+        desc: ''
+        selected: false
+        title: 开始
+        type: start
+        variables: []
+      height: 54
+      id: '1752784900813'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: ''
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 10
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-ai/DeepSeek-V3
+          provider: langgenius/siliconflow/siliconflow
+        prompt_template:
+        - id: c23a8624-c11f-4861-b95a-8e9b85bdf2ce
+          role: system
+          text: "请你根据用户的输入分析提取输出部分示例的json各个字段应该填写的信息，并在输出部分填写对应的信息。\n##输出\n要输出标准的json格式，示例如下供参考：\n\
+            {\n    \"user_uid\": \"comprehensive-test-user-01\",\n    \"user_name\"\
+            : \"王皓\",\n    \"user_contact_info\": {\n      \"phone\": \"139-1234-5678\"\
+            ,\n      \"email\": \"wang.hao.dev@email.com\"\n    },\n    \"user_education\"\
+            : [\n      {\n        \"user_university\": \"复旦大学\",\n        \"user_major\"\
+            : \"计算机科学与技术\",\n        \"degree\": \"工学学士\",\n        \"dates\": \"\
+            2020/09 - 2024/06\",\n        \"details\": \"核心课程：数据结构与算法、操作系统、计算机网络、数据库系统、人工智能导论、编译原理。\"\
+            ,\n        \"user_grade\": \"大四\",\n        \"user_graduate_year\": \"\
+            2024\",\n        \"user_gpa\": \"3.92/4.0\",\n        \"user_language_score\"\
+            : \"TOEFL: 112, GRE: 330\"\n      }\n    ],\n    \"internship_experience\"\
+            : [\n      {\n        \"company\": \"阿里巴巴集团\",\n        \"role\": \"后端研发实习生\
+            \ (阿里云)\",\n        \"location\": \"杭州\",\n        \"dates\": \"2023/07\
+            \ - 2023/09\",\n        \"description_points\": [\n          \"参与阿里云存储服务核心模块的开发，使用\
+            \ Go 语言编写高并发的API接口，QPS提升15%。\",\n          \"负责设计并实现一套内部监控系统，用于追踪服务健康状况和关键性能指标（KPIs）。\"\
+            ,\n          \"协助进行单元测试和集成测试，确保代码质量和服务的稳定性。\"\n        ]\n      },\n \
+            \     {\n        \"company\": \"深思科技 (AI初创公司)\",\n        \"role\": \"\
+            算法实习生\",\n        \"location\": \"上海\",\n        \"dates\": \"2022/12\
+            \ - 2023/03\",\n        \"description_points\": [\n          \"协助研究和实现基于Transformer的自然语言处理模型，用于文本分类任务。\"\
+            ,\n          \"使用 PyTorch 框架进行模型训练和调优，在内部数据集上准确率达到95%。\",\n          \"\
+            负责数据预处理和特征工程，处理超过10GB的文本数据。\"\n        ]\n      }\n    ],\n    \"user_research_experience\"\
+            : [\n      {\n        \"research_project\": \"基于深度学习的图像超分辨率重建研究\",\n \
+            \       \"role\": \"科研助理\",\n        \"location\": \"校内实验室\",\n      \
+            \  \"dates\": \"2022/09 - 2023/05\",\n        \"description_points\":\
+            \ [\n          \"在导师指导下，复现并改进了SRGAN（超分辨率生成对抗网络）模型。\",\n          \"设计并进行多组对比实验，验证了所提改进模块的有效性，峰值信噪比（PSNR）提升了0.5dB。\"\
+            ,\n          \"作为第二作者撰写并发表一篇相关领域的EI会议论文。\"\n        ]\n      }\n    ],\n\
+            \    \"user_extracurricular_activities\": [\n      {\n        \"organization\"\
+            : \"ACM/ICPC 程序设计竞赛队\",\n        \"role\": \"核心队员\",\n        \"location\"\
+            : \"校内\",\n        \"dates\": \"2021/09 - 2023/06\",\n        \"description_points\"\
+            : [\n          \"参与每周高强度算法训练和模拟赛，主攻动态规划与图论问题。\",\n          \"获得ACM/ICPC亚洲区域赛（上海站）银奖。\"\
+            \n        ]\n      }\n    ],\n    \"user_target\": \"申请牛津大学计算机科学硕士项目\"\
+            \n  }\n若无输入则保留空值\n##输入\n{{#sys.query#}}"
+        selected: true
+        title: LLM
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: llm
+      position:
+        x: 381
+        y: 282
+      positionAbsolute:
+        x: 381
+        y: 282
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        answer: '{{#llm.text#}}'
+        desc: ''
+        selected: false
+        title: 直接回复
+        type: answer
+        variables: []
+      height: 105
+      id: answer
+      position:
+        x: 680
+        y: 282
+      positionAbsolute:
+        x: 680
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: 40.1976568293303
+      y: 193.4964042511358
+      zoom: 0.7578582832551992
