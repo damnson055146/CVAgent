@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../Comcomponents/common/Button';
 
+const TEST_USER = {
+  username: "testuser",
+  password: "testpassword"
+};
+
 const LoginPage = ({ setIsAuthenticated }) => {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [error, setError] = useState(null);
@@ -12,6 +17,19 @@ const LoginPage = ({ setIsAuthenticated }) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+
+    // 本地测试账号判断
+    if (
+      credentials.username === TEST_USER.username &&
+      credentials.password === TEST_USER.password
+    ) {
+      localStorage.setItem("access_token", "test-token");
+      localStorage.setItem("userInfo", JSON.stringify({ username: TEST_USER.username }));
+      setIsAuthenticated(true);
+      setLoading(false);
+      navigate("/");
+      return;
+    }
 
     try {
       const response = await fetch('http://localhost:8000/auth/login', {

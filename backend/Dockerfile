@@ -11,6 +11,7 @@ RUN apt-get update \
          libpq-dev \
          gcc \
          postgresql-client \
+         curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 拷贝并安装 Python 依赖
@@ -22,12 +23,12 @@ COPY main.py .
 COPY app/ ./app
 COPY env.example .env
 
-# 暴露容器内端口
-EXPOSE 8000
-
 # 等待数据库启动的脚本
 COPY wait-for-db.sh .
 RUN chmod +x wait-for-db.sh
+
+# 暴露容器内端口
+EXPOSE 8000
 
 # 启动命令
 CMD ["./wait-for-db.sh", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

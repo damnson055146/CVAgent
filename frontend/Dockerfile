@@ -7,19 +7,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # 安装依赖
-RUN npm ci --only=production
+RUN npm ci
 
 # 拷贝源代码
 COPY . .
 
-# 构建应用
-RUN npm run build
-
-# 安装serve来运行构建后的应用
-RUN npm install -g serve
-
 # 暴露端口
 EXPOSE 3000
 
-# 启动命令
-CMD ["serve", "-s", "dist", "-l", "3000"] 
+# 启动开发服务器
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"] 
