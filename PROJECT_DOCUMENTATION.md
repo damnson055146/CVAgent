@@ -125,7 +125,7 @@ LOG_LEVEL=INFO
 
 #### 启动后端服务
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8699
+uvicorn main:app --reload --host 0.0.0.0 --port 8700
 ```
 
 ### 3. 前端设置
@@ -143,8 +143,8 @@ npm run dev
 
 ### 4. 访问应用
 - **前端应用**: http://localhost:5173
-- **后端API**: http://localhost:8699
-- **API文档**: http://localhost:8699/docs
+- **后端API**: http://localhost:8700
+- **API文档**: http://localhost:8700/docs
 
 ## API接口文档
 
@@ -506,7 +506,7 @@ Body:
 
 ### 2. 端口配置
 - **前端**: 5173 (默认)
-- **后端**: 8699 (默认)
+- **后端**: 8700 (默认)
 - **Dify控制台**: 3000 (本地部署时)
 - **Dify API**: 5001 (本地部署时)
 
@@ -522,7 +522,7 @@ Body:
 
 ### 5. 生产部署
 - 使用 `npm run build` 构建前端
-- 使用 `uvicorn main:app --host 0.0.0.0 --port 8699` 启动后端
+- 使用 `uvicorn main:app --host 0.0.0.0 --port 8700` 启动后端
 - 配置反向代理 (Nginx)
 - 设置环境变量
 
@@ -608,7 +608,7 @@ npm run dev -- --port 3000
 ### 2. 健康检查
 ```bash
 # 检查后端服务
-curl http://localhost:8699/
+curl http://localhost:8700/
 
 # 检查前端服务
 curl http://localhost:5173/

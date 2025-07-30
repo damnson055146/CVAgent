@@ -5,7 +5,7 @@
 
 一、公共说明
 
-Base URL：http://<HOST>:<PORT>(后端接口为8699)
+Base URL：http://<HOST>:<PORT>(后端接口为8700)
 
 Content-Type：所有请求均为 application/json（除上传 PDF 接口为 multipart/form-data）。
 

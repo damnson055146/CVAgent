@@ -1,6 +1,6 @@
 // src/services/CVagentAPI.jsx
 
-const API_BASE_URL = 'http://127.0.0.1:8000';  // 后端地址，根据实际环境调整
+const API_BASE_URL = 'http://127.0.0.1:8700';  // 后端地址，根据实际环境调整
 
 // 通用请求头
 const getHeaders = () => ({
@@ -30,7 +30,7 @@ const agentAPI = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const res = await fetch(`${API_BASE_URL}/api/parse-resume/`, {
+    const res = await fetch(`${API_BASE_URL}/parse-resume/`, {
       method: 'POST',
       credentials: 'include',
       body: formData,
@@ -42,7 +42,7 @@ const agentAPI = {
    * 2. 上传简历文本并解析 → JSON (/parse-resume-text/)
    */
   parseTextResume: async (text) => {
-    const res = await fetch(`${API_BASE_URL}/api/parse-resume-text/`, {
+    const res = await fetch(`${API_BASE_URL}/parse-resume-text/`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -65,7 +65,7 @@ const agentAPI = {
    *    直接传整个简历 JSON 对象
    */
   evaluateResume: async (resumeJson) => {
-    const res = await fetch(`${API_BASE_URL}/api/evaluate-resume/`, {
+    const res = await fetch(`${API_BASE_URL}/evaluate-resume/`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -81,7 +81,7 @@ const agentAPI = {
    * @returns {Promise<{rewritten_text: string}>}
    */
   optimizeSelection: async (text) => {
-    const res = await fetch(`${API_BASE_URL}/api/optimize-text/`, {
+    const res = await fetch(`${API_BASE_URL}/optimize-text/`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -96,7 +96,7 @@ const agentAPI = {
    * @returns {Promise<{expanded_text: string}>}
    */
   expandSelection: async (text) => {
-    const res = await fetch(`${API_BASE_URL}/api/expand-text/`, {
+    const res = await fetch(`${API_BASE_URL}/expand-text/`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -111,7 +111,7 @@ const agentAPI = {
    * @returns {Promise<{contracted_text: string}>}
    */
   contractSelection: async (text) => {
-    const res = await fetch(`${API_BASE_URL}/api/contract-text/`, {
+    const res = await fetch(`${API_BASE_URL}/contract-text/`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -127,7 +127,7 @@ const agentAPI = {
    * @returns {Promise<{modified_text: string}>}
    */
   customPromptSelection: async (text, prompt) => {
-    const res = await fetch(`${API_BASE_URL}/api/modified-text-prompt/`, {
+    const res = await fetch(`${API_BASE_URL}/modified-text-prompt/`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
