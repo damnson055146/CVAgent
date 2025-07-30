@@ -1,11 +1,14 @@
 // src/services/CVagentAPI.jsx
 
-const API_BASE_URL = 'http://127.0.0.1:8699';  // 后端地址，根据实际环境调整
-const API_KEY = '9589ca16aa2844de6975809fbac3891ef2a105eadcde6f56e044c60b6b774ec4'; // 待改
+const API_BASE_URL = 'http://127.0.0.1:8000';  // 后端地址，根据实际环境调整
 
 // 通用请求头
 const getHeaders = () => ({
-  'X-API-Key': API_KEY,
+  'Content-Type': 'application/json',
+});
+
+// 带认证的请求头
+const getAuthHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
@@ -27,12 +30,9 @@ const agentAPI = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const res = await fetch(`${API_BASE_URL}/parse-resume/`, {
+    const res = await fetch(`${API_BASE_URL}/api/parse-resume/`, {
       method: 'POST',
-      headers: {
-        'X-API-Key': API_KEY,
-        // 不手动设置 Content-Type，浏览器会自动添加 boundary
-      },
+      credentials: 'include',
       body: formData,
     });
     return handleResponse(res);
@@ -42,9 +42,10 @@ const agentAPI = {
    * 2. 上传简历文本并解析 → JSON (/parse-resume-text/)
    */
   parseTextResume: async (text) => {
-    const res = await fetch(`${API_BASE_URL}/parse-resume-text/`, {
+    const res = await fetch(`${API_BASE_URL}/api/parse-resume-text/`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ text }),
     });
     return handleResponse(res);
@@ -52,18 +53,10 @@ const agentAPI = {
 
   /**
    * 3. 生成 PDF 简历 → Blob (/generate-resume/)
+   * 注意：后端暂未实现此端点
    */
   generateResumePDF: async (profileJson) => {
-    const res = await fetch(`${API_BASE_URL}/generate-resume/`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(profileJson),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `HTTP ${res.status}`);
-    }
-    return res.blob();
+    throw new Error('PDF生成功能暂未实现');
   },
 
   
@@ -72,9 +65,10 @@ const agentAPI = {
    *    直接传整个简历 JSON 对象
    */
   evaluateResume: async (resumeJson) => {
-    const res = await fetch(`${API_BASE_URL}/evaluate-resume/`, {
+    const res = await fetch(`${API_BASE_URL}/api/evaluate-resume/`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify(resumeJson),
     });
     return handleResponse(res);
@@ -87,9 +81,10 @@ const agentAPI = {
    * @returns {Promise<{rewritten_text: string}>}
    */
   optimizeSelection: async (text) => {
-    const res = await fetch(`${API_BASE_URL}/optimize-text/`, {
+    const res = await fetch(`${API_BASE_URL}/api/optimize-text/`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ text }),
     });
     return handleResponse(res);
@@ -101,23 +96,25 @@ const agentAPI = {
    * @returns {Promise<{expanded_text: string}>}
    */
   expandSelection: async (text) => {
-    const res = await fetch(`${API_BASE_URL}/expand-text/`, {
+    const res = await fetch(`${API_BASE_URL}/api/expand-text/`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ text }),
     });
     return handleResponse(res);
   },
 
   /**
-   * 选区缩写
+   * 选区缩句
    * @param {string} text - 选中的文本内容
    * @returns {Promise<{contracted_text: string}>}
    */
   contractSelection: async (text) => {
-    const res = await fetch(`${API_BASE_URL}/contract-text/`, {
+    const res = await fetch(`${API_BASE_URL}/api/contract-text/`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ text }),
     });
     return handleResponse(res);
@@ -130,9 +127,10 @@ const agentAPI = {
    * @returns {Promise<{modified_text: string}>}
    */
   customPromptSelection: async (text, prompt) => {
-    const res = await fetch(`${API_BASE_URL}/modified-text-prompt/`, {
+    const res = await fetch(`${API_BASE_URL}/api/modified-text-prompt/`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ 
         text,
         prompt,
@@ -142,41 +140,77 @@ const agentAPI = {
   },
 
   /**
-   * 保存简历到后端（创建新版本）
-   * @param {Object} resumeData - 简历的结构化JSON数据，用于AI分析和数据处理
-   * @param {string} content - Markdown格式的简历内容，用于展示和预览
-   * @returns {Promise<Object>} 保存结果
+   * 保存简历到数据库
+   * @param {string} content - 简历内容
+   * @returns {Promise<Object>}
    */
   saveResume: async (content) => {
-    const res = await fetch(`${API_BASE_URL}/api/documents_save/resume`, {
+    const formData = new FormData();
+    formData.append('doc_type', 'resume');
+    formData.append('title', '我的简历');
+    formData.append('content', content);
+    formData.append('content_format', 'markdown');
+
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_BASE_URL}/documents/upload`, {
       method: 'POST',
       headers: {
-        ...getHeaders(),
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        user_id: localStorage.getItem('user_id'),
-        content_md: content,     // Markdown格式文本，用于展示
-        
-      })
+      body: formData,
     });
     return handleResponse(res);
   },
 
   /**
-   * 获取简历历史记录
-   * @returns {Promise<Array>} 历史记录列表
+   * 获取用户的简历列表
+   * @returns {Promise<Array>}
    */
-  getResumeHistory: async () => {
-    const res = await fetch(`${API_BASE_URL}/api/documents/resume`, {
+  getResumeList: async () => {
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_BASE_URL}/documents/resume`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * 获取特定简历详情
+   * @param {string} docId - 文档ID
+   * @returns {Promise<Object>}
+   */
+  getResumeDetail: async (docId) => {
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_BASE_URL}/documents/resume/${docId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * 为简历添加新版本
+   * @param {string} docId - 文档ID
+   * @param {string} content - 新版本内容
+   * @returns {Promise<Object>}
+   */
+  addResumeVersion: async (docId, content) => {
+    const formData = new FormData();
+    formData.append('content', content);
+    formData.append('content_format', 'markdown');
+
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_BASE_URL}/documents/resume/${docId}/versions`, {
       method: 'POST',
       headers: {
-        ...getHeaders(),
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        user_id: localStorage.getItem('user_id')
-      })
+      body: formData,
     });
     return handleResponse(res);
   },

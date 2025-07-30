@@ -1,6 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const LandingPage = ({ onStartExplore }) => {
+  const navigate = useNavigate();
   const features = [
     {
       title: "智能简历解析",
@@ -69,13 +71,16 @@ const LandingPage = ({ onStartExplore }) => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
             <button 
-              onClick={onStartExplore}
+              onClick={() => navigate('/login')}
               className="bg-blue-600 text-white px-8 py-4 text-lg font-semibold hover:bg-blue-700 transition-colors"
             >
-              开始探索
+              登录/注册
             </button>
-            <button className="border-2 border-blue-600 text-blue-600 px-8 py-4 text-lg font-semibold hover:bg-blue-50 transition-colors">
-              了解更多
+            <button 
+              onClick={onStartExplore}
+              className="border-2 border-blue-600 text-blue-600 px-8 py-4 text-lg font-semibold hover:bg-blue-50 transition-colors"
+            >
+              开始探索
             </button>
           </div>
         </div>
@@ -155,7 +160,7 @@ const LandingPage = ({ onStartExplore }) => {
             立即体验AI驱动的留学申请助手，让您的申请材料脱颖而出
           </p>
           <button 
-            onClick={onStartExplore}
+            onClick={() => navigate('/login')}
             className="bg-white text-blue-600 px-8 py-4 text-lg font-semibold hover:bg-gray-100 transition-colors"
           >
             免费开始使用

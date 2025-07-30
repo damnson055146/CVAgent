@@ -1,7 +1,40 @@
 
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List, Dict, Any
+from datetime import datetime
+
+# --- 认证相关模型 ---
+class UserCreate(BaseModel):
+    username: Optional[str] = None
+    email: EmailStr
+    password: str = Field(..., min_length=6)
+
+class UserLogin(BaseModel):
+    username: str  # 可以是邮箱或用户名
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+class UserInDB(BaseModel):
+    id: str
+    username: Optional[str]
+    email: str
+    role: str
+    is_active: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 # --- 通用输入模型 ---
 class TextInput(BaseModel):

@@ -1,14 +1,15 @@
 // src/components/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, FileText, PenTool, MessageSquare, CheckCircle, GraduationCap, Clock, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, PenTool, MessageSquare, CheckCircle, GraduationCap, Clock, Home, LogOut, User } from 'lucide-react';
 import Foldicon from './icons/Foldicon'; // 确保路径正确
 
-const Sidebar = ({ activeItem, onChange }) => {
+const Sidebar = ({ activeItem, onChange, onLogout }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [theme, setTheme] = useState(() => {
     // 初始主题从localStorage读取
     return localStorage.getItem('theme') || 'light';
   });
+  const [userInfo, setUserInfo] = useState(null);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -18,6 +19,28 @@ const Sidebar = ({ activeItem, onChange }) => {
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    // 获取用户信息
+    const fetchUserInfo = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch('http://localhost:8000/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const user = await response.json();
+          setUserInfo(user);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user info:', error);
+      }
+    };
+
+    fetchUserInfo();
+  }, []);
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -37,22 +60,19 @@ const Sidebar = ({ activeItem, onChange }) => {
     <div className={`bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-16' : 'w-64'}`}>
       <div className="h-full flex flex-col">
         {/* 顶部区域 */}
-  <div className="p-4 border-b border-gray-100 flex items-center">
-    {/* 左侧折叠图标 */}
-    <div className="cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
-      <Foldicon isCollapsed={isCollapsed} />
-    </div>
+        <div className="p-4 border-b border-gray-100 flex items-center">
+          {/* 左侧折叠图标 */}
+          <div className="cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
+            <Foldicon isCollapsed={isCollapsed} />
+          </div>
 
-    {/* 右侧留学助手（展开时才显示） */}
-    {!isCollapsed && (
-      <div className="ml-3 flex items-center space-x-2">
-       
-        <span className="font-semibold text-">留学助手</span>
-      </div>
-    )}
-  </div>
-
-          
+          {/* 右侧留学助手（展开时才显示） */}
+          {!isCollapsed && (
+            <div className="ml-3 flex items-center space-x-2">
+              <span className="font-semibold text-">留学助手</span>
+            </div>
+          )}
+        </div>
 
         {/* 功能菜单 */}
         <div className="flex-1 p-3">
@@ -93,29 +113,36 @@ const Sidebar = ({ activeItem, onChange }) => {
           </div>
         </div>
 
-        {/* 底部区域（可选） */}
+        {/* 底部用户区域 */}
         <div className="p-3 border-t border-gray-100">
-          <div className={`flex items-center p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
-            <div className="w-6 h-6 bg-gray-300 dark:bg-gray-700 rounded-full flex items-center justify-center">
-              <span className="text-xs text-gray-600 dark:text-gray-200">U</span>
-            </div>
-            {!isCollapsed && (
-              <div className="flex-1 flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-200">用户</div>
-                </div>
-                {/* 主题切换器 */}
-                <button
-                  onClick={toggleTheme}
-                  className="ml-2 px-2 py-1 rounded text-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  title={theme === 'dark' ? '切换为浅色模式' : '切换为深色模式'}
-                >
-                  {theme === 'dark' ? '暗' : '亮'}
-                </button>
+          {userInfo && (
+            <div className={`flex items-center p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
+              <div className="w-6 h-6 bg-gray-300 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-gray-600 dark:text-gray-200" />
               </div>
-              
+              {!isCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {userInfo.username}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {userInfo.email}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* 登出按钮 */}
+          <button
+            onClick={onLogout}
+            className={`w-full flex items-center p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200 text-red-600 dark:text-red-400 ${isCollapsed ? 'justify-center' : 'space-x-3'}`}
+          >
+            <LogOut className="w-5 h-5" />
+            {!isCollapsed && (
+              <span className="text-sm font-medium">登出</span>
             )}
-          </div>
+          </button>
         </div>
       </div>
     </div>

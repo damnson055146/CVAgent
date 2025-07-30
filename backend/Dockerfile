@@ -8,21 +8,26 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
          build-essential \
+         libpq-dev \
+         gcc \
+         postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # 拷贝并安装 Python 依赖
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 拷贝环境变量文件
-COPY .env .
-
 # 拷贝应用代码
 COPY main.py .
 COPY app/ ./app
+COPY env.example .env
 
-# 暴露容器内端口（与 Uvicorn 启动端口一致）
+# 暴露容器内端口
 EXPOSE 8000
 
-# 默认启动命令
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 等待数据库启动的脚本
+COPY wait-for-db.sh .
+RUN chmod +x wait-for-db.sh
+
+# 启动命令
+CMD ["./wait-for-db.sh", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

@@ -281,6 +281,26 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
     }
   }, []);
 
+  // 用原生事件监听器绑定wheel事件，避免passive事件的问题
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const handler = (e) => {
+      const { scrollTop, scrollHeight, clientHeight } = textarea;
+      const delta = e.deltaY;
+      
+      // 检查是否在边界
+      if ((delta > 0 && scrollTop + clientHeight >= scrollHeight) ||
+          (delta < 0 && scrollTop <= 0)) {
+        e.preventDefault();
+      }
+    };
+    
+    textarea.addEventListener('wheel', handler, { passive: false });
+    return () => textarea.removeEventListener('wheel', handler);
+  }, []);
+
   const shouldShowHighlight = showToolbar && selection.text;
   const shouldShowBlueHighlight = shouldShowHighlight;
   const isTextareaTransparent = shouldShowBlueHighlight;
@@ -317,7 +337,6 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
         value={text}
         onChange={handleChange}
         onScroll={handleTextareaScroll}
-        onWheel={handleTextareaWheel}
         className={`absolute inset-0 w-full h-full p-4 resize-none outline-none text-sm leading-relaxed font-mono border-none focus:ring-0 z-10 bg-transparent dark:bg-gray-900 ${
           isDarkMode ? 'selection-dark' : 'selection-light'
         }`}
