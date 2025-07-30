@@ -1,6 +1,4 @@
 // src/components/RenderPreview.jsx
-//把这个文件作为简历预览组件，负责渲染Markdown内容为PDF格式
-// 使用ReactMarkdown和html2canvas生成PDF
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,7 +9,6 @@ import Button from '../Comcomponents/common/Button.jsx';
 import { convertJsonToMarkdown } from '../utils/resumeUtils.jsx';
 
 // --- Helper Function ---
-// 实现一个简单的 debounce (防抖) 函数，避免过于频繁地执行分页计算
 function debounce(func, delay) {
   let timeoutId;
   return function(...args) {
@@ -22,26 +19,34 @@ function debounce(func, delay) {
   };
 }
 
-// A4页面在96DPI下的像素尺寸 (210mm x 297mm)
-const A4_WIDTH_PX = 794;
-const A4_HEIGHT_PX = 1123;
-// 页面内容区的垂直边距 (上下各24px)
+// A4页面尺寸常量
+const A4_WIDTH_PX = 794;  // 210mm * 96dpi / 25.4mm/inch
+const A4_HEIGHT_PX = 1123; // 297mm * 96dpi / 25.4mm/inch
 const PAGE_MARGIN_PX = 48; 
-const MAX_CONTENT_HEIGHT = A4_HEIGHT_PX - (PAGE_MARGIN_PX * 2);
+//解决渲染页面截断问题
+// 实际可用内容高度 = 理论高度 - 页面布局空间 - 样式累积效果 - 安全边距
+// 理论高度: 1123 - 96 = 1027px
+// 页面布局空间: 底部边距24px + 页脚18px + prose样式约50px = 92px
+// 字体渲染差异: 约200px (浏览器字体渲染与测量时的差异)
+// 其他样式累积: 约100px (各种margin、padding的累积)
+// 安全边距: 约8px
+const MAX_CONTENT_HEIGHT = A4_HEIGHT_PX - (PAGE_MARGIN_PX * 2) - 400; // 总计减去400px
+const A4_WIDTH_MM = 210;
+const A4_HEIGHT_MM = 297;
 
 // 预设样式配置
 const DEFAULT_CONFIG = { font: 'SimSun', fontSize: 12, lineHeight: 1.5 };
 const COMPACT_CONFIG = { font: 'SimSun', fontSize: 10.5, lineHeight: 1.3 };
 
-// 优化后的parseCustomBlocks，修复center块连续、空行、冒号行渲染问题
+// 优化后的parseCustomBlocks
 function parseCustomBlocks(md) {
   const lines = md.split(/\r?\n/);
   const blocks = [];
   let i = 0;
+  
   while (i < lines.length) {
-    // 跳过空行
     if (!lines[i].trim()) { i++; continue; }
-    // ::: center 多块，且不渲染:::
+    
     if (/^::: ?center/.test(lines[i])) {
       let content = [];
       i++;
@@ -50,10 +55,10 @@ function parseCustomBlocks(md) {
         i++;
       }
       blocks.push({ type: 'center', content });
-      i++; // skip :::
+      i++;
       continue;
     }
-    // ::: left 多行 + ::: right 多行，按行配对
+    
     if (/^::: ?left/.test(lines[i])) {
       let leftLines = [];
       i++;
@@ -61,8 +66,8 @@ function parseCustomBlocks(md) {
         if (lines[i].trim() !== '') leftLines.push(lines[i]);
         i++;
       }
-      i++; // skip :::
-      // 查找下一个right块
+      i++;
+      
       if (i < lines.length && /^::: ?right/.test(lines[i])) {
         let rightLines = [];
         i++;
@@ -70,7 +75,7 @@ function parseCustomBlocks(md) {
           if (lines[i].trim() !== '') rightLines.push(lines[i]);
           i++;
         }
-        i++; // skip :::
+        i++;
         const maxLen = Math.max(leftLines.length, rightLines.length);
         for (let j = 0; j < maxLen; j++) {
           blocks.push({ type: 'row', left: leftLines[j] || '', right: rightLines[j] || '' });
@@ -81,7 +86,7 @@ function parseCustomBlocks(md) {
         continue;
       }
     }
-    // ::: right 多行
+    
     if (/^::: ?right/.test(lines[i])) {
       let rightLines = [];
       i++;
@@ -93,202 +98,274 @@ function parseCustomBlocks(md) {
       rightLines.forEach(r => blocks.push({ type: 'right', content: r }));
       continue;
     }
-    // ::: left ... ::: ::: right ... ::: 同行
-    if (/^::: ?left/.test(lines[i]) && /^::: ?right/.test(lines[i+1])) {
-      const left = lines[i].replace(/^::: ?left/, '').replace(/^:::/, '').trim();
-      const right = lines[i+1].replace(/^::: ?right/, '').replace(/^:::/, '').trim();
-      blocks.push({ type: 'row', left, right });
-      i += 2;
-      continue;
-    }
-    // 普通行
+    
     blocks.push({ type: 'normal', content: lines[i] });
     i++;
   }
+  
   return blocks;
 }
 
-// 块级分页函数 Ma
+// 块级分页函数
 function renderBlocksToPages(blocks, config, measurerRef) {
-  // 1. 先将每个块渲染到隐藏measurer，测量高度
-  // 2. 累加到一页，超出A4则分页，保证块不被拆分
   const pages = [];
   let currentPage = [];
   let currentHeight = 0;
-  // 临时div用于测量
+  
+  // 创建测量环境
   const tempDiv = document.createElement('div');
-  tempDiv.style.position = 'absolute';
-  tempDiv.style.visibility = 'hidden';
-  tempDiv.style.width = `${A4_WIDTH_PX - (PAGE_MARGIN_PX * 2)}px`;
-  tempDiv.style.fontFamily = config.font;
-  tempDiv.style.fontSize = `${config.fontSize}pt`;
-  tempDiv.style.lineHeight = config.lineHeight;
+  tempDiv.style.cssText = `
+    position: absolute;
+    visibility: hidden;
+    top: -9999px;
+    left: -9999px;
+    width: ${A4_WIDTH_PX - (PAGE_MARGIN_PX * 2)}px;
+    font-family: ${config.font};
+    font-size: ${config.fontSize}pt;
+    line-height: ${config.lineHeight};
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  `;
   document.body.appendChild(tempDiv);
-  for (let i = 0; i < blocks.length; i++) {
-    // 渲染单个块
-    let blockEl = document.createElement('div');
-    if (blocks[i].type === 'center') {
-      blocks[i].content.forEach(line => {
-        const el = document.createElement('div');
-        el.className = 'text-center my-1';
-        el.innerHTML = line;
-        blockEl.appendChild(el);
-      });
-    } else if (blocks[i].type === 'row') {
-      const row = document.createElement('div');
-      row.className = 'flex flex-row justify-between my-1';
-      const left = document.createElement('div');
-      left.className = 'text-left flex-1';
-      left.innerHTML = blocks[i].left;
-      const right = document.createElement('div');
-      right.className = 'text-right flex-1';
-      right.innerHTML = blocks[i].right;
-      row.appendChild(left);
-      row.appendChild(right);
-      blockEl.appendChild(row);
-    } else if (blocks[i].type === 'left') {
-      const el = document.createElement('div');
-      el.className = 'text-left my-1';
-      el.innerHTML = blocks[i].content;
-      blockEl.appendChild(el);
-    } else if (blocks[i].type === 'right') {
-      const el = document.createElement('div');
-      el.className = 'text-right my-1';
-      el.innerHTML = blocks[i].content;
-      blockEl.appendChild(el);
-    } else {
-      const el = document.createElement('div');
-      el.innerHTML = blocks[i].content;
-      blockEl.appendChild(el);
+
+  // 测量单个块的高度
+  function measureBlock(block) {
+    if (!block || (!block.content && !block.left && !block.right)) {
+      return 20;
     }
-    tempDiv.appendChild(blockEl);
-    const blockHeight = blockEl.offsetHeight;
-    tempDiv.removeChild(blockEl);
-    // 分页逻辑
+
+    let blockEl = document.createElement('div');
+    blockEl.style.cssText = `
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      box-sizing: border-box;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    `;
+    
+    try {
+      if (block.type === 'center') {
+        const content = Array.isArray(block.content) ? block.content : [block.content];
+        content.forEach(line => {
+          if (line && line.trim()) {
+            const el = document.createElement('div');
+            el.style.cssText = 'text-align: center; margin: 4px 0;';
+            el.textContent = line.replace(/[#*_`]/g, '');
+            blockEl.appendChild(el);
+          }
+        });
+      } else if (block.type === 'row') {
+        const row = document.createElement('div');
+        row.style.cssText = 'display: flex; justify-content: space-between; margin: 4px 0;';
+        
+        const left = document.createElement('div');
+        left.style.cssText = 'flex: 1; text-align: left;';
+        left.textContent = (block.left || '').replace(/[#*_`]/g, '');
+        
+        const right = document.createElement('div');
+        right.style.cssText = 'flex: 1; text-align: right;';
+        right.textContent = (block.right || '').replace(/[#*_`]/g, '');
+        
+        row.appendChild(left);
+        row.appendChild(right);
+        blockEl.appendChild(row);
+      } else if (block.type === 'left') {
+        const el = document.createElement('div');
+        el.style.cssText = 'text-align: left; margin: 4px 0;';
+        el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        blockEl.appendChild(el);
+      } else if (block.type === 'right') {
+        const el = document.createElement('div');
+        el.style.cssText = 'text-align: right; margin: 4px 0;';
+        el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        blockEl.appendChild(el);
+      } else {
+        // normal类型 - 更精确的测量
+        const el = document.createElement('div');
+        el.style.cssText = `
+          margin: 0;
+          padding: 0;
+          font-family: ${config.font};
+          font-size: ${config.fontSize}pt;
+          line-height: ${config.lineHeight};
+          word-wrap: break-word;
+          white-space: pre-wrap;
+        `;
+        el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        blockEl.appendChild(el);
+      }
+      
+      tempDiv.appendChild(blockEl);
+      
+      // 强制重新计算布局
+      tempDiv.offsetHeight;
+      blockEl.offsetHeight;
+      
+      let blockHeight = blockEl.offsetHeight;
+      tempDiv.removeChild(blockEl);
+      
+      // 对于normal类型，确保最小高度
+      if (block.type === 'normal' && blockHeight < 16) {
+        blockHeight = Math.max(16, config.fontSize * config.lineHeight * 1.2);
+      }
+      
+      if (blockHeight <= 0) {
+        const contentLength = (block.content || block.left || block.right || '').length;
+        const estimatedLines = Math.max(1, Math.ceil(contentLength / 80));
+        blockHeight = estimatedLines * (config.fontSize * config.lineHeight * 1.33);
+      }
+      
+      return Math.max(blockHeight, 16);
+      
+    } catch (error) {
+      console.error('Error measuring block:', error, block);
+      const contentLength = (block.content || block.left || block.right || '').length;
+      return Math.max(20, contentLength * 0.5);
+    }
+  }
+
+  // 简化的分页逻辑
+  console.log('开始分页处理，总块数:', blocks.length);
+  
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    
+    if (!block || (!block.content && !block.left && !block.right)) {
+      console.warn(`跳过无效块 ${i}:`, block);
+      continue;
+    }
+    
+    const blockHeight = measureBlock(block);
+    console.log(`块 ${i} (${block.type}) 高度: ${blockHeight}px, 当前页高度: ${currentHeight}px`);
+    
+    // 如果当前页放不下这个块，先保存当前页
     if (currentHeight + blockHeight > MAX_CONTENT_HEIGHT && currentPage.length > 0) {
+      console.log(`保存当前页，包含 ${currentPage.length} 个块，高度: ${currentHeight}px`);
       pages.push([...currentPage]);
       currentPage = [];
       currentHeight = 0;
     }
-    currentPage.push(blocks[i]);
+    
+    // 将块添加到当前页
+    currentPage.push(block);
     currentHeight += blockHeight;
+    console.log(`块 ${i} 添加到当前页，页面高度更新为: ${currentHeight}px`);
   }
-  if (currentPage.length > 0) pages.push(currentPage);
-  document.body.removeChild(tempDiv);
-  return pages;
+  
+  // 处理最后一页
+  if (currentPage.length > 0) {
+    console.log(`保存最后一页，包含 ${currentPage.length} 个块，高度: ${currentHeight}px`);
+    pages.push(currentPage);
+  }
+  
+  // 清理DOM
+  if (tempDiv.parentNode) {
+    document.body.removeChild(tempDiv);
+  }
+  
+  console.log(`分页完成，总共 ${pages.length} 页`);
+  pages.forEach((page, idx) => {
+    console.log(`页面 ${idx + 1}: ${page.length} 个块`);
+  });
+  
+  return pages.length > 0 ? pages : [[]];
 }
 
+// 同时修复 CustomMarkdownPage 组件，添加更好的错误处理
 function CustomMarkdownPage({ blocks }) {
+  // 添加调试信息
+  console.log('CustomMarkdownPage 渲染，接收到的块数:', blocks?.length || 0);
+  
+  if (!blocks || !Array.isArray(blocks) || blocks.length === 0) {
+    console.warn('CustomMarkdownPage 接收到空的或无效的 blocks');
+    return <div className="w-full pl-0 text-gray-400">此页无内容</div>;
+  }
+
   return (
     <div className="w-full pl-0">
       {blocks.map((block, idx) => {
-        if (block.type === 'center') {
-          return block.content.map((line, i) => (
-            <div key={idx + '-' + i} className="text-center my-1">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{line}</ReactMarkdown>
-            </div>
-          ));
-        } else if (block.type === 'row') {
+        if (!block) {
+          console.warn(`块 ${idx} 为 null 或 undefined`);
+          return null;
+        }
+
+        try {
+          if (block.type === 'center') {
+            const content = Array.isArray(block.content) ? block.content : [block.content];
+            return content.map((line, i) => (
+              <div key={`${idx}-${i}`} className="text-center my-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{line || ''}</ReactMarkdown>
+              </div>
+            ));
+          } else if (block.type === 'row') {
+            return (
+              <div key={idx} className="flex flex-row justify-between my-1 w-full">
+                <div className="text-left flex-1">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.left || ''}</ReactMarkdown>
+                </div>
+                <div className="text-right flex-1">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.right || ''}</ReactMarkdown>
+                </div>
+              </div>
+            );
+          } else if (block.type === 'left') {
+            return (
+              <div key={idx} className="text-left my-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content || ''}</ReactMarkdown>
+              </div>
+            );
+          } else if (block.type === 'right') {
+            return (
+              <div key={idx} className="text-right my-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.right || ''}</ReactMarkdown>
+              </div>
+            );
+          } else {
+            return (
+              <div key={idx} className="w-full pl-0">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content || ''}</ReactMarkdown>
+              </div>
+            );
+          }
+        } catch (error) {
+          console.error(`渲染块 ${idx} 时出错:`, error, block);
           return (
-            <div key={idx} className="flex flex-row justify-between my-1 w-full">
-              <div className="text-left flex-1"><ReactMarkdown remarkPlugins={[remarkGfm]}>{block.left}</ReactMarkdown></div>
-              <div className="text-right flex-1"><ReactMarkdown remarkPlugins={[remarkGfm]}>{block.right}</ReactMarkdown></div>
+            <div key={idx} className="w-full pl-0 text-red-500 text-sm">
+              [渲染错误: {block.type}]
             </div>
           );
-        } else if (block.type === 'left') {
-          return <div key={idx} className="text-left my-1"><ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown></div>;
-        } else if (block.type === 'right') {
-          return <div key={idx} className="text-right my-1"><ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown></div>;
-        } else {
-          return <div className="w-full pl-0"><ReactMarkdown key={idx} remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown></div>;
         }
       })}
     </div>
   );
 }
 
-
-const RenderPreview = forwardRef(({ content, config, resumeData, theme = 'style1' }, ref) => {
-  const [loading, setLoading] = useState(false); // 添加 loading 状态
-  const [pages, setPages] = useState([]); // 添加 pages state
+const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData, theme = 'style1' }, ref) => {
+  const [loading, setLoading] = useState(false);
+  const [pages, setPages] = useState([]);
   const pageContainerRef = useRef(null);
   const measurerRef = useRef(null);
-  const measurerRootRef = useRef(null);
 
-  // 使用 useCallback 和 debounce 来创建高性能的分页函数
-  const paginateContent = useCallback(debounce(() => {
-    if (!content || !measurerRef.current) {
-      setPages([]);
-      return;
-    }
-
-    // 只对measurerRef.current调用一次createRoot，后续复用
-    if (!measurerRootRef.current) {
-      measurerRootRef.current = createRoot(measurerRef.current);
-    }
-    measurerRootRef.current.render(
-      <div 
-        style={{ fontFamily: config.font, fontSize: `${config.fontSize}pt`, lineHeight: config.lineHeight }}
-        className="prose prose-sm max-w-none"
-      >
-        <CustomMarkdownPage blocks={parseCustomBlocks(content)} />
-      </div>
-    );
-
-    // 等待React渲染完成
-    setTimeout(() => {
-      const children = Array.from(measurerRef.current.children[0]?.children || []);
-      if (children.length === 0) {
-        setPages([]);
-        return;
-      }
-
-      // 2. 分发DOM元素到各个页面
-      const newPages = [];
-      let currentPageElementsHTML = '';
-      let currentPageHeight = 0;
-
-      children.forEach(el => {
-        const elementHeight = el.offsetHeight;
-        
-        if (currentPageHeight + elementHeight > MAX_CONTENT_HEIGHT && currentPageElementsHTML !== '') {
-          newPages.push(currentPageElementsHTML);
-          currentPageElementsHTML = el.outerHTML;
-          currentPageHeight = elementHeight;
-        } else {
-          currentPageElementsHTML += el.outerHTML;
-          currentPageHeight += elementHeight;
-        }
-      });
-      
-      if (currentPageElementsHTML !== '') {
-        newPages.push(currentPageElementsHTML);
-      }
-
-      setPages(newPages);
-    }, 50); // 短暂延迟以确保DOM测量准确
-  }, 300), [content, config]);
-
-  // 在主函数中，分页逻辑替换为块级分页
   useEffect(() => {
     if (!content) {
       setPages([]);
       return;
     }
-    const blocks = parseCustomBlocks(content);
-    const pagesArr = renderBlocksToPages(blocks, config, measurerRef);
-    setPages(pagesArr);
+    
+    try {
+      const blocks = parseCustomBlocks(content);
+      const pagesArr = renderBlocksToPages(blocks, config, measurerRef);
+      setPages(pagesArr);
+    } catch (error) {
+      console.error('分页处理失败:', error);
+      setPages([]);
+    }
   }, [content, config]);
   
-  const handleSmartLayout = (type) => {
-    if (type === 'compact' && pages.length > 1) {
-      setConfig(COMPACT_CONFIG);
-    } else {
-      setConfig(DEFAULT_CONFIG);
-    }
-  };
-
-  // 修改 generatePDF 函数，确保可以访问 setLoading
   const generatePDF = useCallback(async () => {
     if (!pageContainerRef.current || pages.length === 0) {
       alert('无内容可生成PDF');
@@ -297,56 +374,47 @@ const RenderPreview = forwardRef(({ content, config, resumeData, theme = 'style1
 
     setLoading(true);
     try {
-      // 使用像素单位(pt)初始化PDF，1pt=1px(96dpi)
-      const pdf = new jsPDF('p', 'pt', [A4_WIDTH_PX, A4_HEIGHT_PX]);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [A4_WIDTH_MM, A4_HEIGHT_MM]
+      });
+      
       const pageElements = pageContainerRef.current.querySelectorAll('.resume-page');
 
       for (let i = 0; i < pageElements.length; i++) {
         const pageEl = pageElements[i];
         
-        // 临时调整样式确保精确捕获
-        const originalStyles = {
-          transform: pageEl.style.transform,
-          boxShadow: pageEl.style.boxShadow
-        };
-        pageEl.style.transform = 'none';
-        pageEl.style.boxShadow = 'none';
-
-        // 计算缩放比例（针对高分屏优化）
-        const scale = 2; // 固定使用2倍缩放以确保清晰度
+        // 确保页面元素有正确的尺寸
+        pageEl.style.width = `${A4_WIDTH_PX}px`;
+        pageEl.style.height = `${A4_HEIGHT_PX}px`;
+        pageEl.style.padding = `${PAGE_MARGIN_PX}px`;
         
         const canvas = await html2canvas(pageEl, {
-          scale,
-          width: A4_WIDTH_PX,
-          height: A4_HEIGHT_PX,
+          scale: 2,
           useCORS: true,
           backgroundColor: '#ffffff',
           logging: false,
-          scrollX: 0,
-          scrollY: -window.scrollY
+          width: A4_WIDTH_PX,
+          height: A4_HEIGHT_PX,
+          windowWidth: A4_WIDTH_PX,
+          windowHeight: A4_HEIGHT_PX
         });
-
-        // 恢复原始样式
-        pageEl.style.transform = originalStyles.transform;
-        pageEl.style.boxShadow = originalStyles.boxShadow;
 
         const imgData = canvas.toDataURL('image/jpeg', 1.0);
         
-        if (i > 0) {
-          pdf.addPage([A4_WIDTH_PX, A4_HEIGHT_PX], 'p');
-        }
+        if (i > 0) pdf.addPage();
         
         pdf.addImage(
           imgData, 
           'JPEG', 
           0, 
           0, 
-          A4_WIDTH_PX, 
-          A4_HEIGHT_PX
+          A4_WIDTH_MM, 
+          A4_HEIGHT_MM
         );
       }
 
-      // 生成PDF文件
       pdf.save(`${resumeData?.user_name || 'resume'}_简历.pdf`);
     } catch (error) {
       console.error('生成PDF失败:', error);
@@ -356,28 +424,12 @@ const RenderPreview = forwardRef(({ content, config, resumeData, theme = 'style1
     }
   }, [pages, resumeData]);
 
-  // 暴露 generatePDF 方法给父组件
   useImperativeHandle(ref, () => ({
     generatePDF
   }), [generatePDF]);
 
-  // 样式选项
-  const themeOptions = [
-    { key: 'style1', label: '1' },
-    { key: 'style2', label: '2' },
-  ];
-  const currentThemeLabel = themeOptions.find(opt => opt.key === theme)?.label || '1';
-
-  // 点击切换主题
-  const handleThemeChange = (key) => {
-    setTheme(key);
-    setMenuOpen(false);
-  };
-
-  // 只保留分页、内容渲染部分
   return (
     <div className={`h-full flex flex-col bg-gray-300 dark:bg-gray-900 resume-theme-${theme}`}>
-      {/* Loading 遮罩 */}
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-4 flex items-center space-x-3">
@@ -387,8 +439,6 @@ const RenderPreview = forwardRef(({ content, config, resumeData, theme = 'style1
         </div>
       )}
       
-      <div ref={measurerRef} style={{ width: `${A4_WIDTH_PX - (PAGE_MARGIN_PX * 2)}px`, position: 'absolute', left: '-9999px', top: 0, zIndex: -1, visibility: 'hidden', pointerEvents: 'none' }}></div>
-      {/* 预览内容区域 */}
       <div ref={pageContainerRef} className="flex-1 overflow-y-auto bg-gray-300 dark:bg-gray-900 p-8">
         {content && pages.length > 0 ? (
           pages.map((pageBlocks, index) => (
@@ -397,20 +447,22 @@ const RenderPreview = forwardRef(({ content, config, resumeData, theme = 'style1
               className={`resume-page bg-white shadow-lg mx-auto mb-8 resume-preview-content`}
               style={{
                 width: `${A4_WIDTH_PX}px`,
-                minHeight: `${A4_HEIGHT_PX}px`,
+                height: `${A4_HEIGHT_PX}px`,
                 padding: `${PAGE_MARGIN_PX}px`,
                 fontFamily: config.font,
                 fontSize: `${config.fontSize}pt`,
                 lineHeight: config.lineHeight,
                 position: 'relative',
+                overflow: 'hidden',
               }}
             >
-              {/* 顶部彩色条 */}
-              {/* <div className="resume-color-bar"></div> */}
-              <div className="prose prose-sm max-w-none resume-markdown dark:prose-invert">
-                <CustomMarkdownPage blocks={pageBlocks} />
+              <div className="prose prose-sm max-w-none resume-markdown dark:prose-invert" 
+                   style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ flex: '1 1 auto', overflow: 'hidden' }}>
+                  <CustomMarkdownPage blocks={pageBlocks} />
+                </div>
+                <div style={{ flex: '0 0 24px' }}></div>
               </div>
-              {/* 页脚图案 */}
               <div className="resume-footer-decor">AI智能简历</div>
             </div>
           ))
@@ -422,9 +474,10 @@ const RenderPreview = forwardRef(({ content, config, resumeData, theme = 'style1
           </div>
         )}
       </div>
-      {/* 样式相关 style 保留 */}
+      
+      {/* 样式部分保持不变 */}
       <style>{`
-        @keyframes fadeInUp {
+       @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
@@ -510,73 +563,8 @@ const RenderPreview = forwardRef(({ content, config, resumeData, theme = 'style1
           opacity: 0.7;
         }
       `}</style>
-      {/* 样式2：黑白灰 */}
-      <style>{`
-        .resume-theme-style2 .resume-color-bar {
-          display: none;
-        }
-        .resume-theme-style2 .resume-page {
-          background: #fff;
-          border-radius: 0;
-          // box-shadow: 0 2px 12px 0 #0002;
-          border: 1.5px solid #e5e7eb;
-        }
-        .resume-theme-style2 .resume-markdown h1 {
-          font-size: 2.1rem;
-          font-weight: bold;
-          color: #222;
-          border-bottom: 2px solid #e5e7eb;
-          margin-bottom: 1.1rem;
-          padding-bottom: 0.4rem;
-          letter-spacing: 0.5px;
-        }
-        .resume-theme-style2 .resume-markdown h2 {
-          font-size: 1.25rem;
-          color: #222;
-          margin-top: 1.3rem;
-          margin-bottom: 0.8rem;
-          font-weight: 600;
-          background: #f5f5f5;
-          border-left: 4px solid #bbb;
-          padding-left: 0.5rem;
-        }
-        .resume-theme-style2 .resume-markdown h3 {
-          font-size: 1.05rem;
-          color: #444;
-          margin-top: 0.8rem;
-          margin-bottom: 0.4rem;
-          font-weight: 500;
-        }
-        .resume-theme-style2 .resume-markdown strong {
-          color: #111;
-          font-weight: bold;
-        }
-        .resume-theme-style2 .resume-markdown ul {
-          margin-left: 1.2rem;
-          margin-bottom: 0.7rem;
-        }
-        .resume-theme-style2 .resume-markdown li {
-          margin-bottom: 0.3rem;
-        }
-        .resume-theme-style2 .resume-markdown p {
-          margin-bottom: 0.5rem;
-        }
-        .resume-theme-style2 .resume-markdown hr {
-          border: none;
-          border-top: 1px solid #e5e7eb;
-          margin: 1.1rem 0;
-        }
-        .resume-theme-style2 .resume-footer-decor {
-          position: absolute;
-          bottom: 14px;
-          right: 24px;
-          font-size: 0.9rem;
-          color: #bbb;
-          letter-spacing: 0.5px;
-          opacity: 0.7;
-        }
-      `}</style>
     </div>
   );
 });
+
 export default RenderPreview;
