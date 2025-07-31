@@ -5,14 +5,18 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # 安装系统依赖
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-         build-essential \
-         libpq-dev \
-         gcc \
-         postgresql-client \
-         curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN echo "deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy main restricted universe multiverse\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-updates main restricted universe multiverse\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-backports main restricted universe multiverse\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-security main restricted universe multiverse" > /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        gcc \
+        postgresql-client \
+        curl && \
+    rm -rf /var/lib/apt/lists/*
 
 # 配置pip镜像源（中国）
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ \
