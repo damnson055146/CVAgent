@@ -1,4 +1,4 @@
-// src/components/ResumeForm.jsx
+// src/CVcomponents/ResumeForm.jsx
 // 简历表单组件，允许用户填写和编辑简历信息
 import React, { useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Check } from 'lucide-react';

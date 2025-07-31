@@ -1,5 +1,5 @@
 import React from 'react';
-// src/components/common/Button.jsx
+// src/comcomponents/common/Button.jsx
 // 通用按钮组件，支持不同类型、尺寸和加载状态
 /**
  * 通用美观按钮组件
