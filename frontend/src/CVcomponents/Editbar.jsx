@@ -6,6 +6,7 @@ import { Undo2, Redo2 } from 'lucide-react';
 import HistoryIcon from '../Comcomponents/icons/Historyicon.jsx';
 import HistoryPanel from '../CVcomponents/HistoryPanel.jsx';
 import agentAPI from '../services/CVagentAPI.jsx';
+import { createHistoryItem, saveHistoryItem } from '../utils/historyUtils.js';
 
 const DEFAULT_CONFIG = { font: 'SimSun', fontSize: 12, lineHeight: 1.5 };
 const COMPACT_CONFIG = { font: 'SimSun', fontSize: 10.5, lineHeight: 1.3 };
@@ -196,20 +197,26 @@ export default function Editbar({
       <Button
         onClick={async () => {
           try {
+            // 获取用户ID
+            const userId = localStorage.getItem('user_id');
+            if (!userId) {
+              alert('用户未登录，请先登录');
+              return;
+            }
+            
             // 保存到后端并创建新版本
-            const saveResult = await agentAPI.saveResume(content);
+            const saveResult = await agentAPI.saveResume(content, userId);
             
             if (saveResult.id) {
               // 生成PDF
               onSavePDF();
               
-              // 添加到历史记录
+              // 同时保存到本地历史记录
               const historyItem = createHistoryItem(
                 content, 
                 config, 
                 resumeData, 
-                'manual_save',
-                saveResult.id // 添加文档ID到历史记录
+                'manual_save'
               );
               saveHistoryItem(historyItem);
               

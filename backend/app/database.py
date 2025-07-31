@@ -9,7 +9,8 @@ from sqlalchemy.exc import OperationalError
 load_dotenv(encoding='utf-8')
 
 # 数据库配置
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:010921@127.0.0.1:5400/aiagent")
+DATABASE_URL = "sqlite:///./cv_agent.db"
+# DATABASE_URL = "postgresql+psycopg2://postgres:010921@127.0.0.1:5433/aiagent"
 # DATABASE_URL = os.getenv(
 #     "DATABASE_URL",
 #     "postgresql://postgres:13689282250@localhost:5432/resumedb"

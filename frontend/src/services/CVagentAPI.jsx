@@ -1,14 +1,11 @@
 // src/services/CVagentAPI.jsx
 
-const API_BASE_URL = 'http://127.0.0.1:8700';  // 后端地址，根据实际环境调整
+const API_BASE_URL = 'http://127.0.0.1:8699';  // 后端地址，根据实际环境调整
+const API_KEY = '9589ca16aa2844de6975809fbac3891ef2a105eadcde6f56e044c60b6b774ec4'; // 后端测试用API密钥
 
 // 通用请求头
 const getHeaders = () => ({
-  'Content-Type': 'application/json',
-});
-
-// 带认证的请求头
-const getAuthHeaders = () => ({
+  'X-API-Key': API_KEY,
   'Content-Type': 'application/json',
 });
 
@@ -32,7 +29,10 @@ const agentAPI = {
 
     const res = await fetch(`${API_BASE_URL}/parse-resume/`, {
       method: 'POST',
-      credentials: 'include',
+      headers: {
+        'X-API-Key': API_KEY,
+        // 不手动设置 Content-Type，浏览器会自动添加 boundary
+      },
       body: formData,
     });
     return handleResponse(res);
@@ -53,10 +53,18 @@ const agentAPI = {
 
   /**
    * 3. 生成 PDF 简历 → Blob (/generate-resume/)
-   * 注意：后端暂未实现此端点
    */
   generateResumePDF: async (profileJson) => {
-    throw new Error('PDF生成功能暂未实现');
+    const res = await fetch(`${API_BASE_URL}/generate-resume/`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(profileJson),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${res.status}`);
+    }
+    return res.blob();
   },
 
   
@@ -142,37 +150,22 @@ const agentAPI = {
   /**
    * 保存简历到数据库
    * @param {string} content - 简历内容
+   * @param {string} userId - 用户ID
    * @returns {Promise<Object>}
    */
-  saveResume: async (content) => {
-    const formData = new FormData();
-    formData.append('doc_type', 'resume');
-    formData.append('title', '我的简历');
-    formData.append('content', content);
-    formData.append('content_format', 'markdown');
-
+  saveResume: async (content, userId) => {
     const token = localStorage.getItem('access_token');
-    const res = await fetch(`${API_BASE_URL}/documents/upload`, {
+    const res = await fetch(`${API_BASE_URL}/api/documents/resume/save`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
-      body: formData,
-    });
-    return handleResponse(res);
-  },
-
-  /**
-   * 获取用户的简历列表
-   * @returns {Promise<Array>}
-   */
-  getResumeList: async () => {
-    const token = localStorage.getItem('access_token');
-    const res = await fetch(`${API_BASE_URL}/documents/resume`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      credentials: 'include',
+      body: JSON.stringify({
+        user_id: userId,
+        content_md: content,
+      }),
     });
     return handleResponse(res);
   },
@@ -211,6 +204,67 @@ const agentAPI = {
         'Authorization': `Bearer ${token}`,
       },
       body: formData,
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * 获取简历历史版本列表
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Array>}
+   */
+  getResumeHistory: async (userId) => {
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_BASE_URL}/api/documents/resume/history`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        user_id: userId,
+      }),
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * 获取指定版本的完整内容
+   * @param {string} versionId - 版本ID
+   * @returns {Promise<Object>}
+   */
+  getResumeVersion: async (versionId) => {
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_BASE_URL}/api/versions/${versionId}/content`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * 删除指定版本
+   * @param {string} versionId - 版本ID
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Object>}
+   */
+  deleteResumeVersion: async (versionId, userId) => {
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_BASE_URL}/api/versions/${versionId}/delete`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        user_id: userId,
+      }),
     });
     return handleResponse(res);
   },

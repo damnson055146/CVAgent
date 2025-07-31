@@ -24,7 +24,11 @@ const LoginPage = ({ setIsAuthenticated }) => {
       credentials.password === TEST_USER.password
     ) {
       localStorage.setItem("access_token", "test-token");
-      localStorage.setItem("userInfo", JSON.stringify({ username: TEST_USER.username }));
+      localStorage.setItem("user_id", "test-id");
+      localStorage.setItem("userInfo", JSON.stringify({ 
+        username: TEST_USER.username,
+        email: "testuser@example.com"
+      }));
       setIsAuthenticated(true);
       setLoading(false);
       navigate("/");
@@ -32,7 +36,7 @@ const LoginPage = ({ setIsAuthenticated }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:8700/auth/login', {
+      const response = await fetch('http://127.0.0.1:8699/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,6 +57,11 @@ const LoginPage = ({ setIsAuthenticated }) => {
       const data = await response.json();
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
+      localStorage.setItem('user_id', data.user_id);
+      localStorage.setItem('userInfo', JSON.stringify({ 
+        username: data.username, 
+        email: data.email 
+      }));
       
       // 登录成功，设置认证状态并跳转到主页
       setIsAuthenticated(true);

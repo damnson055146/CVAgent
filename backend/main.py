@@ -27,7 +27,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174", "http://localhost:4173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,7 +36,7 @@ app.add_middleware(
 # 包含路由
 app.include_router(router)
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(document_router, prefix="/documents", tags=["documents"])
+app.include_router(document_router, prefix="/api/documents", tags=["documents"])
 
 @app.get("/", tags=["Health Check"])
 def read_root():
