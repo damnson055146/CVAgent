@@ -5,10 +5,10 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # 安装系统依赖
-RUN echo "deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy main restricted universe multiverse\n\
-deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-updates main restricted universe multiverse\n\
-deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-backports main restricted universe multiverse\n\
-deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-security main restricted universe multiverse" > /etc/apt/sources.list && \
+RUN echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib non-free non-free-firmware\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware\n\
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -17,6 +17,7 @@ deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-security main restricted 
         postgresql-client \
         curl && \
     rm -rf /var/lib/apt/lists/*
+
 
 # 配置pip镜像源（中国）
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ \
