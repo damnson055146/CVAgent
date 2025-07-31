@@ -1,7 +1,4 @@
-// src/services/CVagentAPI.jsx
-
-const API_BASE_URL = 'http://127.0.0.1:8699';  // 后端地址，根据实际环境调整
-const API_KEY = '9589ca16aa2844de6975809fbac3891ef2a105eadcde6f56e044c60b6b774ec4'; // 后端测试用API密钥
+import { API_BASE_URL, API_ENDPOINTS, API_KEY } from '../config/api.config';
 
 // 通用请求头
 const getHeaders = () => {
@@ -48,7 +45,7 @@ const agentAPI = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE_URL}/parse-resume/`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.PARSE_PDF}`, {
       method: 'POST',
       headers: headers,
       body: formData,
@@ -172,7 +169,7 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   saveResume: async (content, userId) => {
-    const res = await fetch(`${API_BASE_URL}/api/documents/resume/save`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.SAVE}`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',

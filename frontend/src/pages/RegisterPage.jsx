@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Button from '../Comcomponents/common/Button';
+import { API_BASE_URL, API_ENDPOINTS } from '../config/api.config';
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -31,7 +32,7 @@ const RegisterPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8699/auth/register', {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.REGISTER}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -161,9 +162,9 @@ const RegisterPage = () => {
 
           <div className="text-center">
             <div className="text-sm">
-              <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
                 已有账号？去登录
-              </a>
+              </Link>
             </div>
           </div>
         </form>

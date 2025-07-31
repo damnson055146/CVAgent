@@ -1,5 +1,5 @@
 import React from 'react';
-// src/components/icons/foldicon.jsx
+// src/components/icons/Foldicon.jsx
 const Foldicon = () => {
   return (
     <svg

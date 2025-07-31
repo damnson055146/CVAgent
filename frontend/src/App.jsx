@@ -8,6 +8,7 @@ import RecGenerator from './pages/RecGenerator';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import { API_BASE_URL, API_ENDPOINTS } from './config/api.config';
 
 const App = () => {
   const [activeItem, setActiveItem] = useState(-1);
@@ -20,7 +21,7 @@ const App = () => {
       const token = localStorage.getItem('access_token');
       if (token) {
         try {
-          const response = await fetch('http://127.0.0.1:8699/auth/me', {
+          const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.ME}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -46,7 +47,7 @@ const App = () => {
     try {
       const token = localStorage.getItem('access_token');
       if (token) {
-        await fetch('http://127.0.0.1:8699/auth/logout', {
+        await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.LOGOUT}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -75,7 +76,7 @@ const App = () => {
         {/* 未认证用户的路由 */}
         {!isAuthenticated ? (
           <>
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<LandingPage isAuthenticated={isAuthenticated} />} />
             <Route path="/login" element={<LoginPage setIsAuthenticated={setIsAuthenticated} />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -96,7 +97,7 @@ const App = () => {
                   )}
                   <div className={`${activeItem !== -1 ? 'flex-1' : 'w-full'}`}>
                     {activeItem === -1 ? (
-                      <LandingPage onStartExplore={() => setActiveItem(2)} />
+                      <LandingPage isAuthenticated={isAuthenticated} onStartExplore={() => setActiveItem(2)} />
                     ) : activeItem === 2 ? (
                       <CVPage />
                     ) : activeItem === 0 ? (

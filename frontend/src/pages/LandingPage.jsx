@@ -1,8 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const LandingPage = ({ onStartExplore }) => {
+const LandingPage = ({ onStartExplore, isAuthenticated }) => {
   const navigate = useNavigate();
+  
+  const handleStartExplore = () => {
+    if (isAuthenticated) {
+      onStartExplore();
+    } else {
+      navigate('/login');
+    }
+  };
+  
   const features = [
     {
       title: "智能简历解析",
@@ -44,10 +53,18 @@ const LandingPage = ({ onStartExplore }) => {
         <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="text-xl sm:text-2xl font-bold">CV Agent</div>
-            <nav className="hidden md:flex space-x-8">
+            <nav className="hidden md:flex space-x-8 items-center">
               <a href="#features" className="hover:text-blue-200 transition-colors">功能</a>
               <a href="#about" className="hover:text-blue-200 transition-colors">关于</a>
               <a href="#contact" className="hover:text-blue-200 transition-colors">联系</a>
+              {!isAuthenticated && (
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="bg-white text-blue-600 px-4 py-2 rounded text-sm font-semibold hover:bg-blue-50 transition-colors"
+                >
+                  登录/注册
+                </button>
+              )}
             </nav>
             <div className="md:hidden">
               <div className="w-8 h-8 bg-green-500 flex items-center justify-center text-white text-xs font-bold">
@@ -71,13 +88,7 @@ const LandingPage = ({ onStartExplore }) => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
             <button 
-              onClick={() => navigate('/login')}
-              className="bg-blue-600 text-white px-8 py-4 text-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              登录/注册
-            </button>
-            <button 
-              onClick={onStartExplore}
+              onClick={handleStartExplore}
               className="border-2 border-blue-600 text-blue-600 px-8 py-4 text-lg font-semibold hover:bg-blue-50 transition-colors"
             >
               开始探索
@@ -210,4 +221,4 @@ const LandingPage = ({ onStartExplore }) => {
   );
 };
 
-export default LandingPage; 
+export default LandingPage;

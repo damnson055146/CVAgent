@@ -26,7 +26,7 @@ const Sidebar = ({ activeItem, onChange, onLogout }) => {
     const fetchUserInfo = async () => {
       try {
         const token = localStorage.getItem('access_token');
-        const response = await fetch('http://127.0.0.1:8699/auth/me', {
+        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.ME}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },

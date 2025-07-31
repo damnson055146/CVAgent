@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../Comcomponents/common/Button';
+import { API_BASE_URL, API_ENDPOINTS } from '../config/api.config';
 
 const TEST_USER = {
   username: "testuser",
@@ -15,7 +16,6 @@ const LoginPage = ({ setIsAuthenticated }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
 
     // 本地测试账号判断
@@ -36,7 +36,7 @@ const LoginPage = ({ setIsAuthenticated }) => {
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:8699/auth/login', {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.LOGIN}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -152,4 +152,4 @@ const LoginPage = ({ setIsAuthenticated }) => {
   );
 };
 
-export default LoginPage; 
+export default LoginPage;
