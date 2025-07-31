@@ -4,8 +4,9 @@ FROM python:3.11-slim
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖
-RUN echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib non-free non-free-firmware\n\
+# 完整替换源并清理旧的 apt 配置
+RUN rm -f /etc/apt/sources.list.d/* && \
+    echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib non-free non-free-firmware\n\
 deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware\n\
 deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware\n\
 deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
@@ -17,6 +18,7 @@ deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-backports main contrib
         postgresql-client \
         curl && \
     rm -rf /var/lib/apt/lists/*
+
 
 
 # 配置pip镜像源（中国）
