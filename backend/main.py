@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.api.auth_routes import router as auth_router
 from app.api.document_routes import router as document_router
+from app.api.version_routes import router as version_router
 from app.database import engine, test_database_connection
 from app.models import user_models, document_models
 
@@ -36,7 +37,8 @@ app.add_middleware(
 # 包含路由
 app.include_router(router)
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(document_router, prefix="/api/documents", tags=["documents"])
+app.include_router(document_router, prefix="/api", tags=["documents"])
+app.include_router(version_router, prefix="/api", tags=["versions"])
 
 @app.get("/", tags=["Health Check"])
 def read_root():
@@ -47,6 +49,6 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8700)
 
 

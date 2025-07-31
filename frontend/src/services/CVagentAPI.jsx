@@ -4,10 +4,20 @@ const API_BASE_URL = 'http://127.0.0.1:8699';  // 后端地址，根据实际环
 const API_KEY = '9589ca16aa2844de6975809fbac3891ef2a105eadcde6f56e044c60b6b774ec4'; // 后端测试用API密钥
 
 // 通用请求头
-const getHeaders = () => ({
-  'X-API-Key': API_KEY,
-  'Content-Type': 'application/json',
-});
+const getHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  const headers = {
+    'api_key': API_KEY,
+    'Content-Type': 'application/json',
+  };
+  
+  // 如果有token，添加到Authorization header
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
 
 // 统一响应处理
 const handleResponse = async (res) => {
@@ -27,12 +37,20 @@ const agentAPI = {
     const formData = new FormData();
     formData.append('file', file);
 
+    const headers = {
+      'api_key': API_KEY,
+      // 不手动设置 Content-Type，浏览器会自动添加 boundary
+    };
+    
+    // 添加Authorization header
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${API_BASE_URL}/parse-resume/`, {
       method: 'POST',
-      headers: {
-        'X-API-Key': API_KEY,
-        // 不手动设置 Content-Type，浏览器会自动添加 boundary
-      },
+      headers: headers,
       body: formData,
     });
     return handleResponse(res);
@@ -154,13 +172,9 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   saveResume: async (content, userId) => {
-    const token = localStorage.getItem('access_token');
     const res = await fetch(`${API_BASE_URL}/api/documents/resume/save`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       credentials: 'include',
       body: JSON.stringify({
         user_id: userId,
@@ -176,12 +190,9 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   getResumeDetail: async (docId) => {
-    const token = localStorage.getItem('access_token');
     const res = await fetch(`${API_BASE_URL}/documents/resume/${docId}`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: getHeaders(),
     });
     return handleResponse(res);
   },
@@ -197,12 +208,19 @@ const agentAPI = {
     formData.append('content', content);
     formData.append('content_format', 'markdown');
 
+    const headers = {
+      'api_key': API_KEY,
+    };
+    
+    // 添加Authorization header
     const token = localStorage.getItem('access_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${API_BASE_URL}/documents/resume/${docId}/versions`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: headers,
       body: formData,
     });
     return handleResponse(res);
@@ -214,13 +232,9 @@ const agentAPI = {
    * @returns {Promise<Array>}
    */
   getResumeHistory: async (userId) => {
-    const token = localStorage.getItem('access_token');
     const res = await fetch(`${API_BASE_URL}/api/documents/resume/history`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       credentials: 'include',
       body: JSON.stringify({
         user_id: userId,
@@ -235,16 +249,26 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   getResumeVersion: async (versionId) => {
-    const token = localStorage.getItem('access_token');
+    console.log('正在获取版本内容，版本ID:', versionId);
+    console.log('请求URL:', `${API_BASE_URL}/api/versions/${versionId}/content`);
+    console.log('请求头:', getHeaders());
+    
     const res = await fetch(`${API_BASE_URL}/api/versions/${versionId}/content`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       credentials: 'include',
     });
-    return handleResponse(res);
+    
+    console.log('响应状态:', res.status);
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('API错误响应:', errorText);
+      throw new Error(`HTTP ${res.status}: ${errorText}`);
+    }
+    
+    const result = await res.json();
+    console.log('获取版本内容成功:', result);
+    return result;
   },
 
   /**
@@ -254,19 +278,43 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   deleteResumeVersion: async (versionId, userId) => {
-    const token = localStorage.getItem('access_token');
+    console.log('正在删除版本，版本ID:', versionId, '用户ID:', userId);
+    console.log('请求URL:', `${API_BASE_URL}/api/versions/${versionId}/delete`);
+    console.log('请求头:', getHeaders());
+    
     const res = await fetch(`${API_BASE_URL}/api/versions/${versionId}/delete`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       credentials: 'include',
       body: JSON.stringify({
         user_id: userId,
       }),
     });
-    return handleResponse(res);
+    
+    console.log('删除响应状态:', res.status);
+    
+    // 删除成功返回204，没有响应体
+    if (res.status === 204) {
+      console.log('删除版本成功 (204)');
+      return { success: true, message: 'Version deleted successfully' };
+    }
+    
+    // 删除成功返回200，有响应体
+    if (res.status === 200) {
+      const result = await res.json();
+      console.log('删除版本成功 (200):', result);
+      return { success: true, ...result };
+    }
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('删除版本API错误响应:', errorText);
+      throw new Error(`HTTP ${res.status}: ${errorText}`);
+    }
+    
+    // 其他成功状态码
+    console.log('删除版本成功 (其他状态码)');
+    return { success: true };
   },
 };
 

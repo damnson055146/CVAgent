@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './Comcomponents/Sidebar';
-import CVPage from './pages/CVPage';
+import CVPage from './pages/CVpage';
 import PSGenerator from './pages/PSGenerator';
 import RecGenerator from './pages/RecGenerator';
 import LandingPage from './pages/LandingPage';

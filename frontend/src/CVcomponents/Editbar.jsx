@@ -211,17 +211,16 @@ export default function Editbar({
               // 生成PDF
               onSavePDF();
               
-              // 同时保存到本地历史记录
-              const historyItem = createHistoryItem(
-                content, 
-                config, 
-                resumeData, 
-                'manual_save'
-              );
-              saveHistoryItem(historyItem);
-              
               // 提示保存成功
-              alert('保存成功！');
+              console.log('保存成功！简历已保存到后端');
+              alert('保存成功！简历已保存到后端');
+              
+              // 如果历史记录面板是打开的，强制刷新
+              if (showHistoryPanel) {
+                // 通过改变key来强制重新渲染HistoryPanel
+                setShowHistoryPanel(false);
+                setTimeout(() => setShowHistoryPanel(true), 100);
+              }
             }
           } catch (error) {
             console.error('保存失败:', error);
@@ -258,6 +257,7 @@ export default function Editbar({
         isOpen={showHistoryPanel}
         onClose={() => setShowHistoryPanel(false)}
         onRestore={onRestoreHistory}
+        key={showHistoryPanel ? 'open' : 'closed'} // 强制重新渲染
       />
     </div>
   );

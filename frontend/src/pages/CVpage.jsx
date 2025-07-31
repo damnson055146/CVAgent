@@ -168,10 +168,21 @@ const CVPage = () => {
 
   // 处理历史记录恢复
   const handleRestoreHistory = useCallback((historyItem) => {
-    if (historyItem) {
+    console.log('收到历史记录恢复请求:', historyItem);
+    
+    if (historyItem && historyItem.content) {
+      console.log('正在恢复内容，长度:', historyItem.content.length);
+      
+      // 恢复编辑内容
       setEditContent(historyItem.content);
       setPreviewContent(historyItem.content);
-      setConfig(historyItem.config);
+      
+      // 恢复配置
+      if (historyItem.config) {
+        setConfig(historyItem.config);
+      }
+      
+      // 恢复简历数据
       if (historyItem.resumeData) {
         setResumeData(historyItem.resumeData);
       }
@@ -180,6 +191,11 @@ const CVPage = () => {
       if (autoSaveManagerRef.current) {
         autoSaveManagerRef.current.update(historyItem.content, historyItem.config, historyItem.resumeData);
       }
+      
+      console.log('历史记录恢复完成');
+    } else {
+      console.error('历史记录恢复失败：无效的历史记录项');
+      alert('历史记录恢复失败：无效的历史记录项');
     }
   }, []);
 

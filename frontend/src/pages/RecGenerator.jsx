@@ -102,7 +102,7 @@ const RecGenerator = () => {
                                    <div className="flex justify-between items-center mb-4">
                                        <div className="flex items-center gap-2">
                                            <Edit3 className="text-gray-600 dark:text-gray-400" size={24} />
-                                           <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">原始个人陈述</h2>
+                                           <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">原始推荐信</h2>
                                        </div>
                                        <div className="flex gap-2">
                                            <Button
