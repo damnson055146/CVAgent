@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronUp } from 'lucide-react';
-import Styleswitch from '../icons/Styleswitch';
+import Styleswitch from '../icons/Styleswitch.jsx';
 
 const ModelSelector = () => {
   const [isExpanded, setIsExpanded] = useState(false);

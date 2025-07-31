@@ -1,15 +1,15 @@
-// src/components/HistoryPanel.jsx
+// src/CVcomponents/HistoryPanel.jsx
 import React, { useState, useEffect } from 'react';
 import {
     getHistoryItems,
     deleteHistoryItem,
     clearAllHistory,
-    formatTime,
+    formatTime, 
     restoreHistoryItem,
     renameHistoryItem,
     cleanBackendSaveRecords
 } from '../utils/historyUtils.js';
-import Button from '../Comcomponents/common/Button.jsx';
+import Button from '../comcomponents/common/Button.jsx';
 import { Trash2, RotateCcw, X, Pen } from 'lucide-react';
 import agentAPI from '../services/CVagentAPI.jsx';
 

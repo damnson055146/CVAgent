@@ -1,8 +1,8 @@
-// src/components/UploadCV.jsx
+// src/CVcomponents/UploadCV.jsx
 import React, { useState, useRef } from 'react';
 import { Upload, X, FileText, File } from 'lucide-react';
 import agentAPI from '../services/CVagentAPI.jsx';
-import Button from '../Comcomponents/common/Button.jsx';
+import Button from '../comcomponents/common/Button.jsx';
 
 const UploadCV = ({ onUpload, onClose }) => {
   const [dragActive, setDragActive] = useState(false);

@@ -1,14 +1,14 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Sidebar from './Comcomponents/Sidebar';
-import CVPage from './pages/CVpage';
-import PSGenerator from './pages/PSGenerator';
-import RecGenerator from './pages/RecGenerator';
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import { API_BASE_URL, API_ENDPOINTS } from './config/api.config';
+import Sidebar from './comcomponents/Sidebar';
+import CVPage from './pages/CVPage.jsx';
+import PSGenerator from './pages/PSGenerator.jsx';
+import RecGenerator from './pages/RecGenerator.jsx';
+import LandingPage from './pages/LandingPage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
+import { API_BASE_URL, API_ENDPOINTS } from './config/api.config.js';
 
 const App = () => {
   const [activeItem, setActiveItem] = useState(-1);

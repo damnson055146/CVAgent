@@ -1,11 +1,11 @@
-// src/pages/CVPage.jsx
+// src/pages/CVpage.jsx
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { convertJsonToMarkdown } from '../utils/resumeUtils.jsx';
 import RenderPreview from '../CVcomponents/RenderPreview.jsx';
 import UploadCV from '../CVcomponents/UploadCV.jsx';
 import agentAPI from '../services/CVagentAPI.jsx';
 import '../tailwind.css';
-import Button from '../Comcomponents/common/Button.jsx';
+import Button from '../comcomponents/common/Button.jsx';
 import ResumeForm from '../CVcomponents/ResumeForm.jsx';
 import PreviewEditor from '../CVcomponents/PreviewEditor.jsx';
 import Editbar from '../CVcomponents/Editbar.jsx';

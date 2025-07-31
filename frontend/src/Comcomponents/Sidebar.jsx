@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, FileText, PenTool, MessageSquare, CheckCircle, GraduationCap, Clock, Home, ChevronDown, ChevronUp, LogOut, User } from 'lucide-react';
 import Foldicon from './icons/Foldicon'; // 确保路径正确
+import { API_BASE_URL, API_ENDPOINTS } from '../config/api.config.js';
 
 const Sidebar = ({ activeItem, onChange, onLogout }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);

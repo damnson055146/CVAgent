@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Send, FileText, Edit3, Loader2, ChevronUp } from 'lucide-react';
 import { generateRec } from '../services/RecagentAPI';
-import Button from '../Comcomponents/common/Button';
-import ModelSelector from '../Comcomponents/common/ModelSelector';
-import Styleswitch from '../Comcomponents/icons/Styleswitch';
+import Button from '../comcomponents/common/Button';
+import ModelSelector from '../comcomponents/common/ModelSelector';
+import Styleswitch from '../comcomponents/icons/Styleswitch';
 
 const RecGenerator = () => {
     const [inputText, setInputText] = useState('');

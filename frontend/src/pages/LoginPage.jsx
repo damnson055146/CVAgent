@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Button from '../Comcomponents/common/Button';
+import Button from '../comcomponents/common/Button';
 import { API_BASE_URL, API_ENDPOINTS } from '../config/api.config';
 
 const TEST_USER = {
