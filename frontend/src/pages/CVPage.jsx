@@ -1,4 +1,4 @@
-// src/pages/CVpage.jsx
+// src/pages/CVPage.jsx
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { convertJsonToMarkdown } from '../utils/resumeUtils.jsx';
 import RenderPreview from '../CVcomponents/RenderPreview.jsx';
