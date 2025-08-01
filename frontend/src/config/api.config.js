@@ -1,4 +1,4 @@
-const DEV_BASE_URL = 'http://127.0.0.1:8699';
+const DEV_BASE_URL = 'http://47.93.166.93:8699';
 const PROD_BASE_URL = 'https://api.cvagent.com'; // 生产环境地址
 
 // 检查是否存在环境变量，否则使用默认值
