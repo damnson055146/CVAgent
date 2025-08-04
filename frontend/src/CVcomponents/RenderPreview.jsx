@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { createRoot } from 'react-dom/client';
-import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import Button from '../comcomponents/common/Button.jsx';
 import { convertJsonToMarkdown } from '../utils/resumeUtils.jsx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak } from 'docx';
+import { saveAs } from 'file-saver';
 
 // --- Helper Function ---
 function debounce(func, delay) {
@@ -23,14 +23,13 @@ function debounce(func, delay) {
 const A4_WIDTH_PX = 794;  // 210mm * 96dpi / 25.4mm/inch
 const A4_HEIGHT_PX = 1123; // 297mm * 96dpi / 25.4mm/inch
 const PAGE_MARGIN_PX = 48; 
-//解决渲染页面截断问题
-// 实际可用内容高度 = 理论高度 - 页面布局空间 - 样式累积效果 - 安全边距
-// 理论高度: 1123 - 96 = 1027px
-// 页面布局空间: 底部边距24px + 页脚18px + prose样式约50px = 92px
-// 字体渲染差异: 约200px (浏览器字体渲染与测量时的差异)
-// 其他样式累积: 约100px (各种margin、padding的累积)
-// 安全边距: 约8px
-const MAX_CONTENT_HEIGHT = A4_HEIGHT_PX - (PAGE_MARGIN_PX * 2) - 400; // 总计减去400px
+// 优化内容高度计算，减少页面下方留白
+// 理论可用高度: 1123 - 96 = 1027px
+// 减去页面布局空间: 底部边距24px + 页脚18px + prose样式约50px = 92px
+// 减去字体渲染差异: 约150px (减少从200px)
+// 减去其他样式累积: 约80px (减少从100px)
+// 减去安全边距: 约8px
+const MAX_CONTENT_HEIGHT = A4_HEIGHT_PX - (PAGE_MARGIN_PX * 2) - 400; // 总计减去400px，减少留白
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 
@@ -106,7 +105,128 @@ function parseCustomBlocks(md) {
   return blocks;
 }
 
-// 块级分页函数
+const WORD_STYLE_CONFIG = {
+  style1: {
+    // 基础字体配置
+    baseFont: 'SimSun',
+    baseFontSize: 12, // pt
+    lineHeight: 1.5,
+    
+    // 标题样式配置 - 匹配预览区CSS
+    h1: {
+      fontSize: 44, // 2.2rem * 20 (docx的size单位是半点)
+      color: '000000', // 黑色
+      bold: true,
+      spacing: { after: 480, before: 240 }, // 匹配预览区样式
+    },
+    h2: {
+      fontSize: 30, // 1.5rem * 20
+      color: '00000',
+      bold: true,
+      spacing: { after: 400, before: 300 }, // 匹配预览区样式
+      border: { bottom: { style: 'single', size: 2, color: '494949' } },
+    },
+    h3: {
+      fontSize: 24, // 1.15rem * 20
+      color: '2563EB', // 蓝色
+      bold: true,
+      spacing: { after: 300, before: 240 }, // 匹配预览区样式
+    },
+    
+    // 文本样式 - 匹配预览区的p标签样式
+    paragraph: {
+      fontSize: 24, // 12pt * 2
+      spacing: { after: 280 }, // 匹配预览区的0.7rem margin-bottom
+      lineSpacing: 1.5
+    },
+    
+    // 列表样式 - 匹配预览区的ul和li标签样式
+    list: {
+      fontSize: 24,
+      spacing: { after: 200 }, // 匹配预览区的0.5rem margin-bottom
+      indent: { left: 600 }, // 1.5rem * 400
+      bullet: '•'
+    },
+    
+    // 强调文本
+    strong: {
+      color: '22223B',
+      bold: true
+    },
+    
+    // 分割线 - 匹配预览区的hr标签样式
+    hr: {
+      color: 'B6C6E3',
+      style: 'dashed',
+      spacing: { after: 600, before: 600 } // 匹配预览区的1.5rem margin
+    }
+  }
+};
+
+// PDF样式配置 - 参考Word版本和预览区CSS，确保所有样式都有color属性
+const PDF_STYLE_CONFIG = {
+  style1: {
+    // 基础字体配置
+    baseFont: 'helvetica',
+    baseFontSize: 12, // pt
+    lineHeight: 1.5,
+    
+    // 标题样式配置 - 匹配预览区CSS，减少间距
+    h1: {
+      fontSize: 22, // 2.2rem 转换为PDF尺寸
+      color: [0, 0, 0], // 黑色
+      bold: true,
+      spacing: { after: 8, before: 4 }, // 减少间距
+    },
+    h2: {
+      fontSize: 16, // 1.5rem 转换为PDF尺寸
+      color: [0, 0, 0], //rgb(0, 0, 0) 深蓝色
+      bold: true,
+      spacing: { after: 6, before: 5 }, // 减少间距
+      border: { bottom: { style: 'solid', width: 0.1, color: [73, 73, 73] } }, // width in mm
+    },
+    h3: {
+      fontSize: 14, // 1.15rem 转换为PDF尺寸
+      color: [37, 99, 235], // #2563eb 蓝色
+      bold: true,
+      spacing: { after: 5, before: 4 }, // 减少间距
+    },
+    
+    // 文本样式 - 匹配预览区的p标签样式，减少间距
+    paragraph: {
+      fontSize: 12, // 基础字体大小
+      color: [0, 0, 0], // 确保有颜色属性
+      spacing: { after: 4 }, // 减少间距
+      lineHeight: 1.4, // 稍微减少行高
+    },
+    
+    // 列表样式 - 匹配预览区的ul和li标签样式，减少间距
+    list: {
+      fontSize: 12,
+      color: [0, 0, 0], // 确保有颜色属性
+      spacing: { after: 3 }, // 减少间距
+      indent: { left: 5 }, // 缩进 in mm
+      bullet: '•'
+    },
+    
+    // 强调文本
+    strong: {
+      color: [34, 34, 59], // #22223b
+      bold: true
+    },
+    
+    // 分割线 - 匹配预览区的hr标签样式，减少间距
+    hr: {
+      color: [182, 198, 227], // #b6c6e3
+      style: 'dashed',
+      spacing: { after: 10, before: 10 } // 减少间距
+    }
+  }
+};
+
+
+
+// 块级分页函数 - 使用简洁的分页逻辑
 function renderBlocksToPages(blocks, config, measurerRef) {
   const pages = [];
   let currentPage = [];
@@ -275,7 +395,581 @@ function renderBlocksToPages(blocks, config, measurerRef) {
   return pages.length > 0 ? pages : [[]];
 }
 
-// 同时修复 CustomMarkdownPage 组件，添加更好的错误处理
+const generateWordDocument = async (content, config, resumeData) => {
+  try {
+    if (!content || content.trim() === '') {
+      throw new Error('没有内容可生成Word文档');
+    }
+    
+    // 解析自定义块
+    const blocks = parseCustomBlocks(content);
+    console.log('解析到的块数量:', blocks.length);
+    
+    // 使用与预览区相同的分页逻辑
+    const pages = renderBlocksToPages(blocks, config, null);
+    console.log('分页结果:', pages.length, '页');
+    
+    // 获取样式配置
+    const styleConfig = WORD_STYLE_CONFIG.style1; // 可以根据theme参数动态选择
+    // 确保使用与预览区相同的字体配置
+    styleConfig.baseFont = config.font || styleConfig.baseFont;
+    styleConfig.baseFontSize = config.fontSize || styleConfig.baseFontSize;
+    styleConfig.lineHeight = config.lineHeight || styleConfig.lineHeight;
+    
+    // 创建Word文档 - 使用单个section，避免额外的空白页
+    const allChildren = [];
+    
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+      const pageBlocks = pages[pageIndex];
+      const isLastPage = pageIndex === pages.length - 1;
+      const isFirstPage = pageIndex === 0;
+      
+      // 为每一页生成内容
+      const pageChildren = await generateWordContentForPage(pageBlocks, styleConfig, isLastPage, isFirstPage);
+      allChildren.push(...pageChildren);
+    }
+    
+    const sections = [{
+      properties: {
+        page: {
+          size: {
+            width: 11906, // A4 width in EMUs (21cm)
+            height: 16838 // A4 height in EMUs (29.7cm)
+          },
+          margin: {
+            top: 1440, // 1 inch = 1440 EMUs
+            right: 1440,
+            bottom: 1440,
+            left: 1440
+          }
+        }
+      },
+      children: allChildren
+    }];
+    
+    const doc = new Document({
+      sections: sections
+    });
+
+    // 生成并下载文件
+    const blob = await Packer.toBlob(doc);
+    const fileName = `${resumeData?.user_name || 'resume'}_简历_Word版.docx`;
+    
+    saveAs(blob, fileName);
+    console.log('Word文档生成成功');
+    return true;
+    
+  } catch (error) {
+    console.error('生成Word文档失败:', error);
+    throw error;
+  }
+};
+
+const getBlockContentPreview = (block) => {
+  if (!block) return '';
+  
+  try {
+    if (block.type === 'center') {
+      // center类型的content是数组
+      const content = Array.isArray(block.content) ? block.content : [block.content];
+      return content.join(' ').substring(0, 50);
+    } else if (block.type === 'row') {
+      return `${(block.left || '').substring(0, 20)} | ${(block.right || '').substring(0, 20)}`;
+    } else {
+      return (block.content || '').substring(0, 50);
+    }
+  } catch (error) {
+    return '[无法获取预览]';
+  }
+};
+
+// Word内容生成函数
+const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, isFirstPage) => {
+  const children = [];
+  
+  console.log(`生成第${isLastPage ? '最后' : ''}页内容，块数量:`, pageBlocks.length);
+  
+  for (let index = 0; index < pageBlocks.length; index++) {
+    const block = pageBlocks[index];
+    
+    if (!block) {
+      console.warn(`跳过空块 ${index}`);
+      continue;
+    }
+    
+    try {
+      // 修复：为center类型的块添加专门的日志
+      if (block.type === 'center') {
+        console.log(`处理center块 ${index}:`, {
+          type: block.type,
+          content: block.content,
+          preview: getBlockContentPreview(block)
+        });
+        
+        const content = Array.isArray(block.content) ? block.content : [block.content];
+        
+        content.forEach((line, lineIndex) => {
+          if (line && typeof line === 'string' && line.trim()) {
+            console.log(`处理center块第${lineIndex}行:`, line);
+            
+            // 检查是否是标题
+            const headingMatch = line.match(/^(#+)\s*(.+)$/);
+            if (headingMatch) {
+              const level = headingMatch[1].length;
+              const headingText = headingMatch[2];
+              
+              // 根据标题级别设置样式
+              let headingStyle;
+              
+              if (level === 1) {
+                headingStyle = styleConfig.h1;
+              } else if (level === 2) {
+                headingStyle = styleConfig.h2;
+              } else {
+                headingStyle = styleConfig.h3;
+              }
+              
+              const paragraphOptions = {
+                alignment: AlignmentType.CENTER,
+                spacing: headingStyle.spacing,
+              };
+              
+              // 如果是二级标题，添加边框下划线
+              if (level === 2 && headingStyle.border) {
+                paragraphOptions.border = headingStyle.border;
+              }
+              
+              children.push(new Paragraph({
+                ...paragraphOptions,
+                children: [
+                  new TextRun({
+                    text: headingText,
+                    size: headingStyle.fontSize,
+                    font: styleConfig.baseFont,
+                    bold: headingStyle.bold,
+                    color: headingStyle.color
+                  })
+                ]
+              }));
+              
+            } else {
+              // 普通居中文本，支持内联格式
+              const textRuns = parseInlineFormatting(line, styleConfig);
+              
+              children.push(new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 200 },
+                children: textRuns
+              }));
+            }
+          }
+        });
+        
+      } else if (block.type === 'row') {
+        // 左右对齐的行 - 使用表格实现更精确的对齐
+        console.log(`处理row块 ${index}:`, block.left, '|', block.right);
+        
+        // 左右对齐的行，支持内联格式
+        const leftText = block.left || '';
+        const rightText = block.right || '';
+        
+        if (leftText || rightText) {
+          const leftRuns = leftText ? parseInlineFormatting(leftText, styleConfig) : [];
+          const rightRuns = rightText ? parseInlineFormatting(rightText, styleConfig) : [];
+          
+          children.push(new Paragraph({
+            tabStops: [
+              { type: 'right', position: 8500 }
+            ],
+            spacing: { after: 200 },
+            children: [
+              ...leftRuns,
+              new TextRun({ text: '\t' }),
+              ...rightRuns
+            ]
+          }));
+        }
+        
+      } else if (block.type === 'left') {
+        const text = block.content || '';
+        if (text) {
+          const textRuns = parseInlineFormatting(text, styleConfig);
+          children.push(new Paragraph({
+            alignment: AlignmentType.LEFT,
+            spacing: { after: 200 },
+            children: textRuns
+          }));
+        }
+        
+      } else if (block.type === 'right') {
+        const text = block.content || '';
+        if (text) {
+          const textRuns = parseInlineFormatting(text, styleConfig);
+          children.push(new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 200 },
+            children: textRuns
+          }));
+        }
+        
+      } else {
+        // 普通文本块
+        const text = block.content || '';
+        if (typeof text === 'string' && text.trim()) {
+          const parsedContent = parseMarkdownToWordElements(text, styleConfig);
+          children.push(...parsedContent);
+        }
+      }
+      
+    } catch (error) {
+      console.error(`处理Word块 ${index} 时出错:`, error);
+      console.error('块内容:', block);
+      
+      children.push(new Paragraph({
+        children: [
+          new TextRun({
+            text: `[渲染错误: ${block.type} - ${error.message}]`,
+            size: 24,
+            font: 'SimSun',
+            color: 'FF0000'
+          })
+        ],
+        spacing: { after: 200 }
+      }));
+    }
+  }
+  
+  // 如果不是最后一页且不是第一页，添加分页符
+  if (!isLastPage && !isFirstPage) {
+    children.push(new Paragraph({
+      pageBreakBefore: true,
+      children: [new TextRun({ text: '' })]
+    }));
+  }
+  
+  return children;
+};
+
+// 清理Markdown文本的辅助函数
+const cleanMarkdownText = (text) => {
+  if (!text) return '';
+  if (typeof text !== 'string') {
+    console.warn('cleanMarkdownText接收到非字符串类型:', typeof text, text);
+    return String(text);
+  }
+  
+  return text
+    .replace(/^#+\s*/, '') // 移除标题标记
+    // .replace(/\*\*(.*?)\*\*/g, '$1') // 不再移除，交由专门函数处理
+    // .replace(/\*(.*?)\*/g, '$1')   // 不再移除
+    .replace(/`(.*?)`/g, '$1') // 移除代码标记但保留内容
+    .replace(/^\s*[-*+]\s*/, '') // 移除列表标记
+    .trim();
+};
+
+// 解析Markdown到Word元素的函数
+const parseMarkdownToWordElements = (text, styleConfig) => {
+  const elements = [];
+  
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return elements;
+  }
+  
+  try {
+    // 检测标题
+    const headingMatch = text.match(/^(#+)\s*(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingText = headingMatch[2];
+      
+      let headingStyle;
+      
+      if (level === 1) {
+        headingStyle = styleConfig.h1;
+      } else if (level === 2) {
+        headingStyle = styleConfig.h2;
+      } else {
+        headingStyle = styleConfig.h3;
+      }
+      
+      const textRunOptions = {
+        text: headingText,
+        size: headingStyle.fontSize,
+        font: styleConfig.baseFont,
+        bold: headingStyle.bold,
+        color: headingStyle.color
+      };
+      
+      const paragraphOptions = {
+        spacing: headingStyle.spacing
+      };
+      
+      // 如果是二级标题，添加边框下划线
+      if (level === 2 && headingStyle.border) {
+        paragraphOptions.border = headingStyle.border;
+      }
+      
+      elements.push(new Paragraph({
+        ...paragraphOptions,
+        children: [new TextRun(textRunOptions)]
+      }));
+      
+      console.log(`处理${level}级标题: ${headingText}, 样式:`, textRunOptions);
+      return elements;
+    }
+    
+    // 检测分割线
+    if (text.trim() === '---' || text.trim() === '***') {
+      elements.push(new Paragraph({
+        spacing: styleConfig.hr.spacing,
+        children: [
+          new TextRun({
+            text: '─'.repeat(50),
+            size: styleConfig.paragraph.fontSize,
+            font: styleConfig.baseFont,
+            color: styleConfig.hr.color
+          })
+        ]
+      }));
+      return elements;
+    }
+    
+    // 检测列表项
+    const listMatch = text.match(/^\s*[-*+]\s*(.+)$/);
+    if (listMatch) {
+      const listText = listMatch[1];
+      
+      // 处理列表项中的内联格式
+      const listTextRuns = parseInlineFormatting(listText, styleConfig);
+      
+      elements.push(new Paragraph({
+        bullet: {
+          level: 0
+        },
+        spacing: styleConfig.list.spacing,
+        indent: styleConfig.list.indent,
+        children: listTextRuns
+      }));
+      return elements;
+    }
+    
+    // 处理普通段落文本，支持内联格式
+    const textRuns = parseInlineFormatting(text, styleConfig);
+    
+    elements.push(new Paragraph({
+      spacing: styleConfig.paragraph.spacing,
+      children: textRuns
+    }));
+    
+  } catch (error) {
+    console.error('解析Markdown文本时出错:', error);
+    // 返回纯文本段落作为后备
+    elements.push(new Paragraph({
+      spacing: styleConfig.paragraph.spacing,
+      children: [
+        new TextRun({
+          text: cleanMarkdownText(text),
+          size: styleConfig.paragraph.fontSize,
+          font: styleConfig.baseFont
+        })
+      ]
+    }));
+  }
+  
+  return elements;
+};
+
+// 新增：简单的PDF生成函数作为后备
+const generateSimplePdf = async (content, config, resumeData) => {
+  if (!content) {
+    throw new Error('无内容可生成PDF');
+  }
+
+  console.log('生成简单PDF版本...');
+  
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  // 使用默认字体
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+
+  const pageMargin = 20;
+  let yPos = pageMargin;
+
+  // 添加标题
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('简历', pageMargin, yPos);
+  yPos += 20;
+
+  // 添加内容
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  
+  // 清理内容并分割成行
+  const cleanContent = content.replace(/[#*_`]/g, '').trim();
+  const lines = cleanContent.split('\n').filter(line => line.trim());
+  
+  for (const line of lines) {
+    if (yPos > A4_HEIGHT_MM - pageMargin) {
+      doc.addPage();
+      yPos = pageMargin;
+    }
+    
+    try {
+      // 安全地渲染文本
+      doc.text(line, pageMargin, yPos);
+    } catch (textError) {
+      console.warn('文本渲染失败，使用ASCII字符:', textError);
+      // 如果渲染失败，只保留ASCII字符
+      const safeText = line.replace(/[^\x00-\x7F]/g, '');
+      if (safeText.trim()) {
+        doc.text(safeText, pageMargin, yPos);
+      }
+    }
+    
+    yPos += 8; // 固定行高
+  }
+
+  const fileName = `${resumeData?.user_name || 'resume'}_简历_简单版.pdf`;
+  doc.save(fileName);
+  console.log('简单PDF生成成功');
+};
+
+// 解析行内格式的函数
+const parseInlineFormatting = (text, styleConfig) => {
+  const textRuns = [];
+  
+  if (!text || typeof text !== 'string') {
+    return [new TextRun({
+      text: '',
+      size: styleConfig.paragraph.fontSize,
+      font: styleConfig.baseFont
+    })];
+  }
+  
+  try {
+    console.log('解析文本格式:', text);
+    
+    // 创建一个处理队列，按优先级处理不同的格式
+    const formatHandlers = [
+      {
+        // 处理粗体文本 **text**
+        regex: /\*\*(.*?)\*\*/g,
+        name: 'bold',
+        handler: (match, content) => ({
+          text: content,
+          size: styleConfig.paragraph.fontSize,
+          font: styleConfig.baseFont,
+          bold: true,
+          color: styleConfig.strong.color
+        })
+      },
+      {
+        // 处理斜体文本 *text* (单个星号)
+        regex: /(?<!\*)\*([^*]+?)\*(?!\*)/g,
+        name: 'italic',
+        handler: (match, content) => ({
+          text: content,
+          size: styleConfig.paragraph.fontSize,
+          font: styleConfig.baseFont,
+          italics: true
+        })
+      },
+      {
+        // 处理代码文本 `text`
+        regex: /`([^`]+?)`/g,
+        name: 'code',
+        handler: (match, content) => ({
+          text: content,
+          size: styleConfig.paragraph.fontSize,
+          font: 'Courier New', // 使用等宽字体，匹配预览区的代码样式
+          color: '666666',
+          highlight: 'F5F5F5' // 浅灰色背景
+        })
+      }
+    ];
+    
+    // 使用递归方法处理嵌套格式
+    const processTextWithFormats = (inputText, handlerIndex = 0) => {
+      if (handlerIndex >= formatHandlers.length) {
+        // 所有格式都处理完了，返回纯文本
+        if (inputText.trim()) {
+          return [new TextRun({
+            text: inputText,
+            size: styleConfig.paragraph.fontSize,
+            font: styleConfig.baseFont
+          })];
+        }
+        return [];
+      }
+      
+      const handler = formatHandlers[handlerIndex];
+      const regex = new RegExp(handler.regex.source, handler.regex.flags);
+      const results = [];
+      
+      let lastIndex = 0;
+      let match;
+      
+      while ((match = regex.exec(inputText)) !== null) {
+        // 处理格式前的普通文本
+        if (match.index > lastIndex) {
+          const beforeText = inputText.substring(lastIndex, match.index);
+          results.push(...processTextWithFormats(beforeText, handlerIndex + 1));
+        }
+        
+        // 处理格式化文本
+        const formattedTextRun = new TextRun(handler.handler(match, match[1]));
+        results.push(formattedTextRun);
+        
+        console.log(`应用${handler.name}格式:`, match[1]);
+        
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // 处理剩余的普通文本
+      if (lastIndex < inputText.length) {
+        const remainingText = inputText.substring(lastIndex);
+        results.push(...processTextWithFormats(remainingText, handlerIndex + 1));
+      }
+      
+      return results.length > 0 ? results : [new TextRun({
+        text: inputText,
+        size: styleConfig.paragraph.fontSize,
+        font: styleConfig.baseFont
+      })];
+    };
+    
+    const processedRuns = processTextWithFormats(text);
+    textRuns.push(...processedRuns);
+    
+  } catch (error) {
+    console.error('解析行内格式时出错:', error);
+    // 返回纯文本作为后备
+    textRuns.push(new TextRun({
+      text: cleanMarkdownText(text),
+      size: styleConfig.paragraph.fontSize,
+      font: styleConfig.baseFont
+    }));
+  }
+  
+  return textRuns.length > 0 ? textRuns : [new TextRun({
+    text: text,
+    size: styleConfig.paragraph.fontSize,
+    font: styleConfig.baseFont
+  })];
+};
+
+// 将块转换为Word格式（保留原函数用于兼容）
+const generateWordContent = (blocks, config) => {
+  return generateWordContentForPage(blocks, config, true, true);
+};
+
+// 修复 CustomMarkdownPage 组件，添加更好的错误处理
 function CustomMarkdownPage({ blocks }) {
   // 添加调试信息
   console.log('CustomMarkdownPage 渲染，接收到的块数:', blocks?.length || 0);
@@ -344,6 +1038,465 @@ function CustomMarkdownPage({ blocks }) {
   );
 }
 
+// =================================================================
+// ==================== NEW: PDF Generation Logic ==================
+// =================================================================
+
+/**
+ * 【重构】在PDF中渲染带内联格式（如**粗体**）的单行文本
+ * @param {jsPDF} doc - jsPDF实例
+ * @param {string} text - 要渲染的文本行
+ * @param {number} x - 起始x坐标
+ * @param {number} y - y坐标 (文本基线)
+ * @param {object} style - 包含字体、颜色等信息的样式对象
+ * @param {object} strongStyle - 粗体样式
+ */
+function renderStyledLine(doc, text, x, y, style, strongStyle) {
+  const FONT_NAME = style.baseFont || 'helvetica';
+  const FONT_SIZE = style.fontSize;
+  // 确保颜色值是数组格式，防止"is not iterable"错误
+  const NORMAL_COLOR = Array.isArray(style.color) ? style.color : [0,0,0];
+  const STRONG_COLOR = Array.isArray(strongStyle.color) ? strongStyle.color : [34, 34, 59];
+
+  // 将文本按**粗体**标记分割
+  const parts = text.split(/(\*\*.*?\*\*)/g).filter(p => p);
+  let currentX = x;
+
+  parts.forEach(part => {
+    const isBold = part.startsWith('**') && part.endsWith('**');
+    const partText = isBold ? part.slice(2, -2) : part;
+
+    // 设置字体和颜色
+    doc.setFont(FONT_NAME, isBold ? 'bold' : 'normal');
+    doc.setTextColor(...(isBold ? STRONG_COLOR : NORMAL_COLOR));
+
+    try {
+      doc.text(partText, currentX, y);
+      currentX += doc.getTextWidth(partText);
+    } catch (e) {
+      console.warn(`PDF文本渲染失败: "${partText}"`, e);
+      const safeText = partText.replace(/[^\x00-\x7F]/g, '?');
+      doc.text(safeText, currentX, y);
+      currentX += doc.getTextWidth(safeText);
+    }
+  });
+}
+
+/**
+ * 渲染居中的带格式文本
+ */
+function renderStyledLineCentered(doc, text, x, y, style, strongStyle) {
+  const FONT_NAME = style.baseFont || 'helvetica';
+  const FONT_SIZE = style.fontSize;
+  // 确保颜色值是数组格式，防止"is not iterable"错误
+  const NORMAL_COLOR = Array.isArray(style.color) ? style.color : [0,0,0];
+  const STRONG_COLOR = Array.isArray(strongStyle.color) ? strongStyle.color : [34, 34, 59];
+
+  // 将文本按**粗体**标记分割
+  const parts = text.split(/(\*\*.*?\*\*)/g).filter(p => p);
+  let currentX = x;
+
+  parts.forEach(part => {
+    const isBold = part.startsWith('**') && part.endsWith('**');
+    const partText = isBold ? part.slice(2, -2) : part;
+
+    // 设置字体和颜色
+    doc.setFont(FONT_NAME, isBold ? 'bold' : 'normal');
+    doc.setTextColor(...(isBold ? STRONG_COLOR : NORMAL_COLOR));
+
+    try {
+      doc.text(partText, currentX, y);
+      currentX += doc.getTextWidth(partText);
+    } catch (e) {
+      console.warn(`PDF文本渲染失败: "${partText}"`, e);
+      const safeText = partText.replace(/[^\x00-\x7F]/g, '?');
+      doc.text(safeText, currentX, y);
+      currentX += doc.getTextWidth(safeText);
+    }
+  });
+}
+
+/**
+ * 动态生成PDF样式配置，参考Word样式配置和传入的config参数
+ */
+const generatePdfStyleConfig = (config) => {
+  const baseStyleConfig = PDF_STYLE_CONFIG.style1;
+  const baseFontSize = config.fontSize || 12;
+  const baseLineHeight = config.lineHeight || 1.5;
+  
+  // 计算字体大小比例（与Word生成保持一致）
+  // Word中：h1=44pt, h2=30pt, h3=24pt, paragraph=24pt
+  // 转换为比例：h1=1.833, h2=1.25, h3=1.0
+  const h1Ratio = 1.833; // 44/24
+  const h2Ratio = 1.25;  // 30/24
+  const h3Ratio = 1.0;   // 24/24
+  
+  // 动态计算间距（参考Word样式配置的间距比例，但更紧凑）
+  const spacingRatio = (baseFontSize / 12) * 0.7; // 基于12pt的间距比例，但减少30%
+  
+  return {
+    ...baseStyleConfig,
+    // 使用传入的配置覆盖默认值
+    baseFont: config.font || baseStyleConfig.baseFont,
+    baseFontSize: baseFontSize,
+    lineHeight: baseLineHeight,
+    
+    // 根据传入的字体大小动态调整其他样式
+    h1: {
+      ...baseStyleConfig.h1,
+      fontSize: Math.round(baseFontSize * h1Ratio),
+      lineHeight: baseLineHeight,
+      spacing: {
+        after: Math.round(baseStyleConfig.h1.spacing.after * spacingRatio),
+        before: Math.round(baseStyleConfig.h1.spacing.before * spacingRatio)
+      }
+    },
+    h2: {
+      ...baseStyleConfig.h2,
+      fontSize: Math.round(baseFontSize * h2Ratio),
+      lineHeight: baseLineHeight,
+      spacing: {
+        after: Math.round(baseStyleConfig.h2.spacing.after * spacingRatio),
+        before: Math.round(baseStyleConfig.h2.spacing.before * spacingRatio)
+      }
+    },
+    h3: {
+      ...baseStyleConfig.h3,
+      fontSize: Math.round(baseFontSize * h3Ratio),
+      lineHeight: baseLineHeight,
+      spacing: {
+        after: Math.round(baseStyleConfig.h3.spacing.after * spacingRatio),
+        before: Math.round(baseStyleConfig.h3.spacing.before * spacingRatio)
+      }
+    },
+    paragraph: {
+      ...baseStyleConfig.paragraph,
+      fontSize: baseFontSize,
+      lineHeight: baseLineHeight,
+      spacing: {
+        after: Math.round(baseStyleConfig.paragraph.spacing.after * spacingRatio)
+      }
+    },
+    list: {
+      ...baseStyleConfig.list,
+      fontSize: baseFontSize,
+      lineHeight: baseLineHeight,
+      spacing: {
+        after: Math.round(baseStyleConfig.list.spacing.after * spacingRatio)
+      },
+      indent: {
+        left: Math.round(baseStyleConfig.list.indent.left * spacingRatio)
+      }
+    },
+    hr: {
+      ...baseStyleConfig.hr,
+      spacing: {
+        after: Math.round(baseStyleConfig.hr.spacing.after * spacingRatio),
+        before: Math.round(baseStyleConfig.hr.spacing.before * spacingRatio)
+      }
+    }
+  };
+};
+
+/**
+ * 【重构】生成带样式的文本版PDF的核心函数
+ */
+const generateTextualPdf = async (content, config, resumeData) => {
+  if (!content) throw new Error('无内容可生成PDF');
+  console.log('开始生成PDF，使用带样式版本...');
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  
+  // 使用动态生成的PDF样式配置
+  const styleConfig = generatePdfStyleConfig(config);
+  console.log('PDF样式配置:', styleConfig);
+  
+  // 设置字体支持，优先使用传入的字体，如果没有则使用默认字体
+  let FONT_NAME = styleConfig.baseFont;
+  
+  // 检查是否需要中文字体支持
+  const hasChineseChars = /[\u4e00-\u9fff]/.test(content);
+  if (hasChineseChars) {
+    // 如果有中文字符，尝试使用支持中文的字体
+    if (config.font && config.font.toLowerCase().includes('simsun')) {
+      FONT_NAME = 'SimSun';
+    } else if (config.font && config.font.toLowerCase().includes('microsoft')) {
+      FONT_NAME = 'Microsoft YaHei';
+    } else {
+      // 默认使用helvetica，但添加中文字体支持
+      FONT_NAME = 'helvetica';
+      console.log('检测到中文字符，使用helvetica字体（可能需要额外配置）');
+    }
+  }
+  
+  doc.setFont(FONT_NAME, 'normal');
+
+  const PAGE_MARGIN = 20;
+  const CONTENT_WIDTH = A4_WIDTH_MM - PAGE_MARGIN * 2;
+  const PAGE_BOTTOM_MARGIN = A4_HEIGHT_MM - PAGE_MARGIN;
+  let yPos = PAGE_MARGIN;
+
+  const ptToMm = (pt) => pt * 0.352778;
+
+  const checkPageBreak = (y, neededHeight = 10) => {
+    if (y + neededHeight > PAGE_BOTTOM_MARGIN) {
+      doc.addPage();
+      return PAGE_MARGIN;
+    }
+    return y;
+  };
+
+  const blocks = parseCustomBlocks(content);
+
+  for (const block of blocks) {
+    if (!block) continue;
+
+    yPos = checkPageBreak(yPos);
+
+    try {
+      // 居中块 - 参考Word生成逻辑
+      if (block.type === 'center') {
+        console.log('处理center块:', block);
+        const content = Array.isArray(block.content) ? block.content : [block.content];
+        
+        content.forEach((line, lineIndex) => {
+          if (line && typeof line === 'string' && line.trim()) {
+            console.log(`处理center块第${lineIndex}行:`, line);
+            
+            // 检查是否是标题
+            const headingMatch = line.match(/^(#+)\s*(.+)$/);
+            if (headingMatch) {
+              const level = headingMatch[1].length;
+              const headingText = headingMatch[2];
+              
+              // 根据标题级别设置样式
+              let headingStyle;
+              
+              if (level === 1) {
+                headingStyle = styleConfig.h1;
+              } else if (level === 2) {
+                headingStyle = styleConfig.h2;
+              } else {
+                headingStyle = styleConfig.h3;
+              }
+              
+              yPos += (headingStyle.spacing.before || 0);
+              yPos = checkPageBreak(yPos);
+              
+              doc.setFont(FONT_NAME, headingStyle.bold ? 'bold' : 'normal');
+              doc.setFontSize(headingStyle.fontSize);
+              doc.setTextColor(...headingStyle.color);
+              
+              const textLines = doc.splitTextToSize(headingText, CONTENT_WIDTH);
+              doc.text(textLines, A4_WIDTH_MM / 2, yPos, { align: 'center' });
+              
+              const textHeight = textLines.length * ptToMm(headingStyle.fontSize) * (headingStyle.lineHeight || 1.2);
+              yPos += textHeight;
+              
+              // 如果是二级标题，添加边框下划线
+              if (level === 2 && headingStyle.border) {
+                const textWidth = doc.getTextWidth(headingText);
+                const lineY = yPos - textHeight + ptToMm(headingStyle.fontSize) + 1;
+                const lineX = (A4_WIDTH_MM - textWidth) / 2;
+                doc.setDrawColor(...headingStyle.border.bottom.color);
+                doc.setLineWidth(headingStyle.border.bottom.width);
+                doc.line(lineX, lineY, lineX + textWidth, lineY);
+              }
+              
+              yPos += headingStyle.spacing.after;
+              
+            } else {
+              // 普通居中文本，支持内联格式
+              const style = styleConfig.paragraph;
+              yPos += (style.spacing.before || 0);
+              yPos = checkPageBreak(yPos);
+              
+              doc.setFont(FONT_NAME, 'normal');
+              doc.setFontSize(style.fontSize);
+              
+              // 处理居中文本，支持内联格式
+              const textLines = doc.splitTextToSize(line, CONTENT_WIDTH);
+              for (const textLine of textLines) {
+                // 计算居中位置
+                const textWidth = doc.getTextWidth(textLine);
+                const centerX = (A4_WIDTH_MM - textWidth) / 2;
+                
+                // 渲染带格式的文本
+                renderStyledLineCentered(doc, textLine, centerX, yPos, style, styleConfig.strong);
+                yPos += ptToMm(style.fontSize) * style.lineHeight;
+              }
+              
+              yPos += style.spacing.after;
+            }
+          }
+        });
+      } 
+      // 左右对齐 - 参考Word生成逻辑
+      else if (block.type === 'row') {
+          console.log('处理row块:', block.left, '|', block.right);
+          
+          const style = styleConfig.paragraph;
+          yPos += (style.spacing.before || 0);
+          yPos = checkPageBreak(yPos);
+          
+          const leftText = block.left || '';
+          const rightText = block.right || '';
+
+          if (leftText || rightText) {
+            doc.setFont(FONT_NAME, 'normal');
+            doc.setFontSize(style.fontSize);
+            
+            // 渲染左侧文本，支持内联格式
+            if (leftText) {
+              renderStyledLine(doc, leftText, PAGE_MARGIN, yPos, style, styleConfig.strong);
+            }
+            
+            // 渲染右侧文本，支持内联格式
+            if (rightText) {
+              const rightCleanText = rightText.replace(/\*\*/g, ''); // 估算宽度用
+              const rightWidth = doc.getTextWidth(rightCleanText);
+              const rightX = A4_WIDTH_MM - PAGE_MARGIN - rightWidth;
+              renderStyledLine(doc, rightText, rightX, yPos, style, styleConfig.strong);
+            }
+
+            yPos += ptToMm(style.fontSize) * style.lineHeight;
+          }
+          
+          yPos += style.spacing.after;
+      }
+      // 左对齐或右对齐 - 参考Word生成逻辑
+      else if (block.type === 'left' || block.type === 'right') {
+          const style = styleConfig.paragraph;
+          yPos += (style.spacing.before || 0);
+          yPos = checkPageBreak(yPos);
+
+          const text = block.content || '';
+          if (text) {
+            doc.setFont(FONT_NAME, 'normal');
+            doc.setFontSize(style.fontSize);
+            
+            const textLines = doc.splitTextToSize(text, CONTENT_WIDTH);
+            const align = block.type === 'right' ? 'right' : 'left';
+            const x = align === 'right' ? A4_WIDTH_MM - PAGE_MARGIN : PAGE_MARGIN;
+
+            for (const line of textLines) {
+                yPos = checkPageBreak(yPos, ptToMm(style.fontSize));
+                renderStyledLine(doc, line, x, yPos, style, styleConfig.strong);
+                yPos += ptToMm(style.fontSize) * style.lineHeight;
+            }
+          }
+          yPos += style.spacing.after;
+      }
+      // 普通块 - 参考Word生成逻辑
+      else if (block.type === 'normal' && block.content && block.content.trim()) {
+        const text = block.content.trim();
+        const headingMatch = text.match(/^(#+)\s*(.+)$/);
+        const listMatch = text.match(/^\s*[-*+]\s+(.+)$/);
+        const hrMatch = text === '---' || text === '***';
+
+        // 分割线
+        if (hrMatch) {
+            const style = styleConfig.hr;
+            yPos += style.spacing.before;
+            yPos = checkPageBreak(yPos, 2);
+            doc.setDrawColor(...style.color);
+            doc.setLineWidth(0.5);
+            doc.line(PAGE_MARGIN, yPos, A4_WIDTH_MM - PAGE_MARGIN, yPos);
+            yPos += style.spacing.after;
+        }
+        // 标题
+        else if (headingMatch) {
+            const level = headingMatch[1].length;
+            const style = level === 1 ? styleConfig.h1 : level === 2 ? styleConfig.h2 : styleConfig.h3;
+            const headingText = headingMatch[2];
+
+            yPos += style.spacing.before;
+            yPos = checkPageBreak(yPos);
+
+            doc.setFont(FONT_NAME, style.bold ? 'bold' : 'normal');
+            doc.setFontSize(style.fontSize);
+            doc.setTextColor(...style.color);
+
+            const textLines = doc.splitTextToSize(headingText, CONTENT_WIDTH);
+            const textHeight = textLines.length * ptToMm(style.fontSize) * (style.lineHeight || 1.2);
+            
+            yPos = checkPageBreak(yPos, textHeight);
+
+            doc.text(textLines, PAGE_MARGIN, yPos);
+            yPos += textHeight;
+            
+            // H2下划线
+            if (level === 2 && style.border) {
+                const underlineY = yPos + 1; // 紧随文本下方
+                doc.setDrawColor(...style.border.bottom.color);
+                doc.setLineWidth(style.border.bottom.width);
+                doc.line(PAGE_MARGIN, underlineY, A4_WIDTH_MM - PAGE_MARGIN, underlineY);
+                yPos += 2; // 为下划线留出空间
+            }
+            yPos += style.spacing.after;
+        }
+        // 列表
+        else if (listMatch) {
+            const style = styleConfig.list;
+            yPos += (style.spacing.before || 0);
+
+            const listText = listMatch[1];
+            const textLines = doc.splitTextToSize(listText, CONTENT_WIDTH - style.indent.left - 2);
+
+            const textHeight = textLines.length * ptToMm(style.fontSize) * (styleConfig.paragraph.lineHeight || 1.2);
+            yPos = checkPageBreak(yPos, textHeight);
+
+            doc.setFont(FONT_NAME, 'normal');
+            doc.setFontSize(style.fontSize);
+            doc.setTextColor(...style.color);
+            doc.text(style.bullet, PAGE_MARGIN, yPos);
+
+            for(const line of textLines) {
+              renderStyledLine(doc, line, PAGE_MARGIN + style.indent.left, yPos, styleConfig.paragraph, styleConfig.strong);
+              yPos += ptToMm(style.fontSize) * styleConfig.paragraph.lineHeight;
+            }
+            yPos += style.spacing.after;
+        }
+        // 段落
+        else {
+            const style = styleConfig.paragraph;
+            yPos += (style.spacing.before || 0);
+
+            const textLines = doc.splitTextToSize(text, CONTENT_WIDTH);
+            const textHeight = textLines.length * ptToMm(style.fontSize) * style.lineHeight;
+            yPos = checkPageBreak(yPos, textHeight);
+            
+            doc.setFont(FONT_NAME, 'normal');
+            doc.setFontSize(style.fontSize);
+
+            for (const line of textLines) {
+                renderStyledLine(doc, line, PAGE_MARGIN, yPos, style, styleConfig.strong);
+                yPos += ptToMm(style.fontSize) * style.lineHeight;
+            }
+            yPos += style.spacing.after;
+        }
+      }
+    } catch (error) {
+      console.error(`处理PDF块时出错:`, error, block);
+      yPos = checkPageBreak(yPos);
+      doc.setTextColor(255, 0, 0);
+      doc.setFontSize(10);
+      doc.text(`[渲染错误: ${block?.type || '未知类型'}]`, PAGE_MARGIN, yPos);
+      yPos += 5;
+    }
+  }
+
+  const fileName = `${resumeData?.user_name || 'resume'}_简历.pdf`;
+  try {
+    doc.save(fileName);
+    console.log('文字版PDF生成成功');
+  } catch (saveError) {
+    console.error('保存PDF文件时出错:', saveError);
+    throw new Error(`保存PDF文件失败: ${saveError.message}`);
+  }
+};
+
+
 const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData, theme = 'style1' }, ref) => {
   const [loading, setLoading] = useState(false);
   const [pages, setPages] = useState([]);
@@ -366,75 +1519,80 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
     }
   }, [content, config]);
   
+  // MODIFIED: PDF generation logic is now text-based
   const generatePDF = useCallback(async () => {
-    if (!pageContainerRef.current || pages.length === 0) {
-      alert('无内容可生成PDF');
+    setLoading(true);
+    try {
+      console.log('开始生成PDF，内容长度:', content?.length || 0);
+      
+      if (!content || content.trim() === '') {
+        throw new Error('没有内容可生成PDF');
+      }
+      
+      await generateTextualPdf(content, config, resumeData);
+
+    } catch (error) {
+      console.error('生成文字版PDF失败:', error);
+      
+      try {
+        console.log('尝试生成简单PDF版本...');
+        await generateSimplePdf(content, config, resumeData);
+      } catch (simpleError) {
+        console.error('简单PDF生成也失败:', simpleError);
+        alert(`生成PDF失败: ${error.message}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [content, config, resumeData]);
+
+  const generateWord = useCallback(async () => {
+    if (!content) {
+      alert('无内容可生成Word文档');
       return;
     }
 
     setLoading(true);
     try {
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [A4_WIDTH_MM, A4_HEIGHT_MM]
-      });
+      // 确保使用与预览区相同的配置
+      const wordConfig = {
+        ...config,
+        font: config.font || 'SimSun',
+        fontSize: config.fontSize || 12,
+        lineHeight: config.lineHeight || 1.5
+      };
       
-      const pageElements = pageContainerRef.current.querySelectorAll('.resume-page');
-
-      for (let i = 0; i < pageElements.length; i++) {
-        const pageEl = pageElements[i];
-        
-        // 确保页面元素有正确的尺寸
-        pageEl.style.width = `${A4_WIDTH_PX}px`;
-        pageEl.style.height = `${A4_HEIGHT_PX}px`;
-        pageEl.style.padding = `${PAGE_MARGIN_PX}px`;
-        
-        const canvas = await html2canvas(pageEl, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          width: A4_WIDTH_PX,
-          height: A4_HEIGHT_PX,
-          windowWidth: A4_WIDTH_PX,
-          windowHeight: A4_HEIGHT_PX
-        });
-
-        const imgData = canvas.toDataURL('image/jpeg', 1.0);
-        
-        if (i > 0) pdf.addPage();
-        
-        pdf.addImage(
-          imgData, 
-          'JPEG', 
-          0, 
-          0, 
-          A4_WIDTH_MM, 
-          A4_HEIGHT_MM
-        );
-      }
-
-      pdf.save(`${resumeData?.user_name || 'resume'}_简历.pdf`);
+      console.log('开始生成Word文档，配置:', wordConfig);
+      await generateWordDocument(content, wordConfig, resumeData);
+      console.log('Word文档生成完成');
+      
     } catch (error) {
-      console.error('生成PDF失败:', error);
-      alert('生成PDF失败，请重试');
+      console.error('生成Word文档失败:', error);
+      alert(`生成Word文档失败: ${error.message}`);
     } finally {
       setLoading(false);
     }
-  }, [pages, resumeData]);
+  }, [content, config, resumeData]);
 
-  useImperativeHandle(ref, () => ({
-    generatePDF
-  }), [generatePDF]);
+  useImperativeHandle(ref, () => {
+    console.log('=== useImperativeHandle被调用 ===');
+    console.log('generatePDF:', generatePDF);
+    console.log('generateWord:', generateWord);
+    
+    return {
+      generatePDF,
+      generateWord
+    };
+  }, [generatePDF, generateWord]);
 
   return (
     <div className={`h-full flex flex-col bg-gray-300 dark:bg-gray-900 resume-theme-${theme}`}>
+      
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-4 flex items-center space-x-3">
             <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
-            <span className="text-gray-700">正在生成PDF...</span>
+            <span className="text-gray-700">正在生成文档...</span>
           </div>
         </div>
       )}
@@ -457,13 +1615,17 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
               }}
             >
               <div className="prose prose-sm max-w-none resume-markdown dark:prose-invert" 
-                   style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                   style={{ 
+                     height: '100%', 
+                     display: 'flex', 
+                     flexDirection: 'column',
+                     '--base-font-size': `${config.fontSize}pt`
+                   }}>
                 <div style={{ flex: '1 1 auto', overflow: 'hidden' }}>
                   <CustomMarkdownPage blocks={pageBlocks} />
                 </div>
-                <div style={{ flex: '0 0 24px' }}></div>
               </div>
-              <div className="resume-footer-decor">AI智能简历</div>
+
             </div>
           ))
         ) : (
@@ -502,33 +1664,34 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
         .resume-theme-style2 .resume-markdown.dark\:prose-invert * {
           color: inherit !important;
         }
-       
-        .resume-theme-style1 .resume-markdown h1 {
-          font-size: 2.2rem;
+        
+        /* 通用标题样式 - 支持动态字体大小 */
+        .resume-markdown h1 {
+          font-size: calc(1.833 * var(--base-font-size, 12pt));
           font-weight: bold;
-          color:rgb(0, 0, 0);
-          // border-bottom: 2px solid #e0e7ef;
+          color: rgb(0, 0, 0);
           margin-bottom: 1.2rem;
           padding-bottom: 0.5rem;
           letter-spacing: 1px;
         }
-        .resume-theme-style1 .resume-markdown h2 {
-          font-size: 1.5rem;
+        .resume-markdown h2 {
+          font-size: calc(1.25 * var(--base-font-size, 12pt));
           color: #0e2954;
           margin-top: 1.5rem;
           margin-bottom: 1rem;
           font-weight: 600;
           border-bottom: 1px solid rgb(73, 73, 73);
           padding-left: 0.6rem;
-          // background: #f1f5fa;
         }
-        .resume-theme-style1 .resume-markdown h3 {
-          font-size: 1.15rem;
+        .resume-markdown h3 {
+          font-size: calc(0.958 * var(--base-font-size, 12pt));
           color: #2563eb;
           margin-top: 1rem;
           margin-bottom: 0.5rem;
           font-weight: 500;
         }
+       
+
         .resume-theme-style1 .resume-markdown strong {
           color: #22223b;
           font-weight: bold;
@@ -553,15 +1716,7 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
           border-radius: 12px;
           overflow: hidden;
         }
-        .resume-theme-style1 .resume-footer-decor {
-          position: absolute;
-          bottom: 18px;
-          right: 32px;
-          font-size: 0.95rem;
-          color: #2563eb99;
-          letter-spacing: 1px;
-          opacity: 0.7;
-        }
+
       `}</style>
     </div>
   );

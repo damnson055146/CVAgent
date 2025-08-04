@@ -12,6 +12,8 @@
   "dependencies": {
     "axios": "^1.10.0",
     "diff-match-patch": "^1.0.5",
+    "docx": "^8.5.0",
+    "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "lucide-react": "^0.525.0",

@@ -166,6 +166,14 @@ const CVPage = () => {
     }
   }, []);
 
+  const handleGenerateWord = useCallback(() => {
+    if (previewRef.current?.generateWord) {
+      previewRef.current.generateWord();
+    } else {
+      alert('Word生成器未就绪，请稍后重试');
+    }
+  }, []);
+
   // 处理历史记录恢复
   const handleRestoreHistory = useCallback((historyItem) => {
     console.log('收到历史记录恢复请求:', historyItem);
@@ -254,6 +262,7 @@ const CVPage = () => {
           isLoading={isLoading}
           resumeData={resumeData}
           onSavePDF={handleSavePDF}
+          onSaveWord={handleGenerateWord}
           canUndo={historyIndex > 0}
           canRedo={historyIndex < history.length - 1}
           onUndo={handleUndo}

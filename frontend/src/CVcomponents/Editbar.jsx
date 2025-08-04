@@ -20,14 +20,21 @@ export default function Editbar({
   isLoading,
   resumeData,
   onSavePDF,
+  onSaveWord, // 确保这里有声明
   canUndo,
   canRedo,
   onUndo,
   onRedo,
   theme,
   setTheme,
-  onRestoreHistory
+  onRestoreHistory,
+  previewRef // 新增：直接传递ref
 }) {
+  console.log('=== Editbar组件渲染 ===');
+  console.log('onSaveWord prop:', onSaveWord);
+  console.log('onSavePDF prop:', onSavePDF);
+  console.log('content prop:', content);
+  console.log('previewRef:', previewRef);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const themeOptions = [
     { key: 'style1', label: '样式1' },
@@ -176,64 +183,73 @@ export default function Editbar({
       {/* 分隔线 */}
       <div className="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-2 flex-shrink-0"></div>
 
-      {/* AI简历测评
-      {/* AI操作按钮
+      {/* 保存按钮组 */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <Button
-          onClick={() => handleAIAction && handleAIAction('evaluate')}
-          disabled={!content || isLoading}
+          onClick={async () => {
+            try {
+              // 获取用户ID
+              const userId = localStorage.getItem('user_id');
+              if (!userId) {
+                alert('用户未登录，请先登录');
+                return;
+              }
+              
+              // 保存到后端并创建新版本
+              const saveResult = await agentAPI.saveResume(content, userId);
+              
+              if (saveResult.id) {
+                // 生成PDF
+                onSavePDF();
+                
+                // 提示保存成功
+                console.log('保存成功！简历已保存到后端');
+                alert('保存成功！简历已保存到后端');
+                
+                // 如果历史记录面板是打开的，强制刷新
+                if (showHistoryPanel) {
+                  // 通过改变key来强制重新渲染HistoryPanel
+                  setShowHistoryPanel(false);
+                  setTimeout(() => setShowHistoryPanel(true), 100);
+                }
+              }
+            } catch (error) {
+              console.error('保存失败:', error);
+              alert('保存失败，请重试');
+            }
+          }}
+          disabled={!content}
           type="ghost"
           size="sm"
           className="whitespace-nowrap w-24"
         >
-          {isLoading ? '处理中...' : '简历测评'}
+          保存简历
         </Button>
-      </div>
-
-      {/* 分隔线 */}
-      {/* <div className="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-2 flex-shrink-0"></div>  */}
-      
-      {/* 保存为PDF按钮 */}
-      <Button
-        onClick={async () => {
-          try {
-            // 获取用户ID
-            const userId = localStorage.getItem('user_id');
-            if (!userId) {
-              alert('用户未登录，请先登录');
+        
+        {/* 新增：保存为Word按钮 */}
+        <Button
+          onClick={() => {
+            if (!content) {
+              alert('无内容可生成Word文档');
               return;
             }
             
-            // 保存到后端并创建新版本
-            const saveResult = await agentAPI.saveResume(content, userId);
-            
-            if (saveResult.id) {
-              // 生成PDF
-              onSavePDF();
-              
-              // 提示保存成功
-              console.log('保存成功！简历已保存到后端');
-              alert('保存成功！简历已保存到后端');
-              
-              // 如果历史记录面板是打开的，强制刷新
-              if (showHistoryPanel) {
-                // 通过改变key来强制重新渲染HistoryPanel
-                setShowHistoryPanel(false);
-                setTimeout(() => setShowHistoryPanel(true), 100);
-              }
+            if (onSaveWord) {
+              onSaveWord();
+            } else {
+              console.error('onSaveWord函数未定义');
+              alert('Word生成器未就绪，请稍后重试');
             }
-          } catch (error) {
-            console.error('保存失败:', error);
-            alert('保存失败，请重试');
-          }
-        }}
-        disabled={!content}
-        type="ghost"
-        size="sm"
-        className="whitespace-nowrap w-24"
-      >
-        保存简历
-      </Button>
+          }}
+          disabled={!content}
+          type="ghost"
+          size="sm"
+          className="whitespace-nowrap w-24 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
+        >
+          保存为Word
+        </Button>
+      </div>
+
       {/* 状态历史 */}
       <HistoryIcon 
         className="w-8 h-6" 
