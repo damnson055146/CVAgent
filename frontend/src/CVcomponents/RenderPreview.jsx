@@ -37,37 +37,39 @@ const A4_HEIGHT_MM = 297;
 const DEFAULT_CONFIG = { font: 'SimSun', fontSize: 12, lineHeight: 1.5 };
 const COMPACT_CONFIG = { font: 'SimSun', fontSize: 10.5, lineHeight: 1.3 };
 
-// 优化后的parseCustomBlocks
+// 支持嵌套对齐的parseCustomBlocks
 function parseCustomBlocks(md) {
   const lines = md.split(/\r?\n/);
   const blocks = [];
   let i = 0;
   
+  console.log('开始解析自定义块，总行数:', lines.length);
+  
   while (i < lines.length) {
-    if (!lines[i].trim()) { i++; continue; }
-    
-    if (/^::: ?center/.test(lines[i])) {
-      let content = [];
-      i++;
-      while (i < lines.length && !/^:::$/.test(lines[i])) {
-        if (lines[i].trim() !== '') content.push(lines[i]);
-        i++;
-      }
-      blocks.push({ type: 'center', content });
-      i++;
-      continue;
+    if (!lines[i].trim()) { 
+      i++; 
+      continue; 
     }
     
-    if (/^::: ?left/.test(lines[i])) {
+    // 检查是否是成对的 left/right 布局
+    if (/^::: ?left(#.*)?$/.test(lines[i])) {
       let leftLines = [];
+      let nestedBlocks = [];
       i++;
+      
       while (i < lines.length && !/^:::$/.test(lines[i])) {
-        if (lines[i].trim() !== '') leftLines.push(lines[i]);
+        if (lines[i].trim() !== '') {
+          leftLines.push(lines[i]);
+          if (/^::: ?(left|right|center|sololeft|solocenter|soloright)(#.*)?$/.test(lines[i])) {
+            nestedBlocks.push(lines[i]);
+          }
+        }
         i++;
       }
       i++;
       
-      if (i < lines.length && /^::: ?right/.test(lines[i])) {
+      // 检查后面是否有右对齐块
+      if (i < lines.length && /^::: ?right(#.*)?$/.test(lines[i])) {
         let rightLines = [];
         i++;
         while (i < lines.length && !/^:::$/.test(lines[i])) {
@@ -81,26 +83,88 @@ function parseCustomBlocks(md) {
         }
         continue;
       } else {
-        leftLines.forEach(l => blocks.push({ type: 'left', content: l }));
+        // 只有左对齐块，作为独立的 left 块处理
+        if (nestedBlocks.length > 0) {
+          const nestedContent = leftLines.join('\n');
+          const nestedParsed = parseCustomBlocks(nestedContent);
+          blocks.push({ 
+            type: 'left', 
+            content: nestedParsed,
+            hasNested: true 
+          });
+        } else {
+          leftLines.forEach(l => blocks.push({ type: 'left', content: l }));
+        }
         continue;
       }
     }
     
-    if (/^::: ?right/.test(lines[i])) {
-      let rightLines = [];
+    // 统一处理其他对齐块类型
+    const alignMatch = lines[i].match(/^::: ?(center|sololeft|solocenter|soloright)(#.*)?$/);
+    if (alignMatch) {
+      const alignType = alignMatch[1];
+      const blockStartIndex = i;
+      let content = [];
+      let nestedBlocks = [];
       i++;
+      
+      console.log(`发现 ${alignType} 对齐块，开始行: ${blockStartIndex}`);
+      
+      // 收集块内容，直到找到结束标记
       while (i < lines.length && !/^:::$/.test(lines[i])) {
-        if (lines[i].trim() !== '') rightLines.push(lines[i]);
+        if (lines[i].trim() !== '') {
+          content.push(lines[i]);
+          // 检查是否有嵌套的对齐块
+          if (/^::: ?(left|right|center|sololeft|solocenter|soloright)(#.*)?$/.test(lines[i])) {
+            nestedBlocks.push(lines[i]);
+          }
+        }
         i++;
       }
-      i++;
-      rightLines.forEach(r => blocks.push({ type: 'right', content: r }));
+      i++; // 跳过结束的 :::
+      
+      console.log(`${alignType} 块内容行数: ${content.length}, 嵌套块数: ${nestedBlocks.length}`);
+      console.log(`${alignType} 块内容:`, content);
+      
+      if (nestedBlocks.length > 0) {
+        // 如果有嵌套块，递归解析
+        const nestedContent = content.join('\n');
+        const nestedParsed = parseCustomBlocks(nestedContent);
+        blocks.push({ 
+          type: alignType, 
+          content: nestedParsed,
+          hasNested: true 
+        });
+        console.log(`${alignType} 块包含嵌套内容，递归解析结果:`, nestedParsed.length, '个子块');
+      } else {
+        // 对于solo类型，整体作为一个块
+        blocks.push({ 
+          type: alignType, 
+          content: content.join('\n'),
+          hasNested: false 
+        });
+      }
       continue;
     }
     
+
+    
+    // 处理普通内容
     blocks.push({ type: 'normal', content: lines[i] });
     i++;
   }
+  
+  console.log('解析完成，生成块数:', blocks.length);
+  blocks.forEach((block, idx) => {
+    console.log(`块 ${idx}: 类型=${block.type}, 内容预览="${
+      typeof block.content === 'string' ? 
+      block.content.substring(0, 30) : 
+      Array.isArray(block.content) ? 
+      `[${block.content.length}个子块]` : 
+      block.left ? `左:${block.left.substring(0, 15)}|右:${(block.right || '').substring(0, 15)}` :
+      '未知格式'
+    }"`);
+  });
   
   return blocks;
 }
@@ -269,15 +333,56 @@ function renderBlocksToPages(blocks, config, measurerRef) {
     
     try {
       if (block.type === 'center') {
-        const content = Array.isArray(block.content) ? block.content : [block.content];
-        content.forEach(line => {
-          if (line && line.trim()) {
-            const el = document.createElement('div');
-            el.style.cssText = 'text-align: center; margin: 4px 0;';
-            el.textContent = line.replace(/[#*_`]/g, '');
-            blockEl.appendChild(el);
-          }
-        });
+        const el = document.createElement('div');
+        el.style.cssText = 'text-align: center; margin: 4px 0;';
+        
+        if (block.hasNested) {
+          // 处理嵌套对齐块
+          block.content.forEach(nestedBlock => {
+            const nestedEl = document.createElement('div');
+            if (nestedBlock.type === 'left') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              // 确保content是字符串
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'right') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'center') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'sololeft') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'solocenter') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'soloright') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else {
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            }
+            el.appendChild(nestedEl);
+          });
+        } else {
+          // 处理普通居中对齐块
+          const content = Array.isArray(block.content) ? block.content : [block.content];
+          content.forEach(line => {
+            if (line && line.trim()) {
+              const lineEl = document.createElement('div');
+              lineEl.textContent = line.replace(/[#*_`]/g, '');
+              el.appendChild(lineEl);
+            }
+          });
+        }
+        blockEl.appendChild(el);
       } else if (block.type === 'row') {
         const row = document.createElement('div');
         row.style.cssText = 'display: flex; justify-content: space-between; margin: 4px 0;';
@@ -296,12 +401,209 @@ function renderBlocksToPages(blocks, config, measurerRef) {
       } else if (block.type === 'left') {
         const el = document.createElement('div');
         el.style.cssText = 'text-align: left; margin: 4px 0;';
-        el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        
+        if (block.hasNested) {
+          // 处理嵌套对齐块
+          block.content.forEach(nestedBlock => {
+            const nestedEl = document.createElement('div');
+            if (nestedBlock.type === 'left') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'right') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'center') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'sololeft') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'solocenter') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'soloright') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else {
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            }
+            el.appendChild(nestedEl);
+          });
+        } else {
+          // 处理普通左对齐块
+          el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        }
         blockEl.appendChild(el);
       } else if (block.type === 'right') {
         const el = document.createElement('div');
         el.style.cssText = 'text-align: right; margin: 4px 0;';
-        el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        
+        if (block.hasNested) {
+          // 处理嵌套对齐块
+          block.content.forEach(nestedBlock => {
+            const nestedEl = document.createElement('div');
+            if (nestedBlock.type === 'left') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'right') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'center') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'soloright') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else {
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            }
+            el.appendChild(nestedEl);
+          });
+        } else {
+          // 处理普通右对齐块
+          el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        }
+        blockEl.appendChild(el);
+      } else if (block.type === 'sololeft') {
+        const el = document.createElement('div');
+        el.style.cssText = 'text-align: left; margin: 4px 0;';
+        
+        if (block.hasNested) {
+          // 处理嵌套对齐块
+          block.content.forEach(nestedBlock => {
+            const nestedEl = document.createElement('div');
+            if (nestedBlock.type === 'left') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'right') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'center') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'sololeft') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'solocenter') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'soloright') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else {
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            }
+            el.appendChild(nestedEl);
+          });
+        } else {
+          // 处理普通单独左对齐块
+          el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        }
+        blockEl.appendChild(el);
+      } else if (block.type === 'solocenter') {
+        const el = document.createElement('div');
+        el.style.cssText = 'text-align: center; margin: 4px 0;';
+        
+        if (block.hasNested) {
+          // 处理嵌套对齐块
+          block.content.forEach(nestedBlock => {
+            const nestedEl = document.createElement('div');
+            if (nestedBlock.type === 'left') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'right') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'center') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'sololeft') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'solocenter') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'soloright') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else {
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            }
+            el.appendChild(nestedEl);
+          });
+        } else {
+          // 处理普通单独居中对齐块
+          el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        }
+        blockEl.appendChild(el);
+      } else if (block.type === 'soloright') {
+        const el = document.createElement('div');
+        el.style.cssText = 'text-align: right; margin: 4px 0;';
+        
+        if (block.hasNested) {
+          // 处理嵌套对齐块
+          block.content.forEach(nestedBlock => {
+            const nestedEl = document.createElement('div');
+            if (nestedBlock.type === 'left') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'right') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'center') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'sololeft') {
+              nestedEl.style.cssText = 'text-align: left; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'solocenter') {
+              nestedEl.style.cssText = 'text-align: center; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else if (nestedBlock.type === 'soloright') {
+              nestedEl.style.cssText = 'text-align: right; margin: 2px 0;';
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            } else {
+              const content = Array.isArray(nestedBlock.content) ? nestedBlock.content.join('') : (nestedBlock.content || '');
+              nestedEl.textContent = content.replace(/[#*_`]/g, '');
+            }
+            el.appendChild(nestedEl);
+          });
+        } else {
+          // 处理普通单独右对齐块
+          el.textContent = (block.content || '').replace(/[#*_`]/g, '');
+        }
         blockEl.appendChild(el);
       } else {
         // normal类型 - 更精确的测量
@@ -961,61 +1263,120 @@ function CustomMarkdownPage({ blocks }) {
     return <div className="w-full pl-0 text-gray-400">此页无内容</div>;
   }
 
-  return (
-    <div className="w-full pl-0">
-      {blocks.map((block, idx) => {
-        if (!block) {
-          console.warn(`块 ${idx} 为 null 或 undefined`);
-          return null;
-        }
+  // 渲染单个块的函数
+  const renderBlock = (block, idx, keyPrefix = '') => {
+    if (!block) {
+      console.warn(`块 ${idx} 为 null 或 undefined`);
+      return null;
+    }
 
-        try {
-          if (block.type === 'center') {
-            const content = Array.isArray(block.content) ? block.content : [block.content];
-            return content.map((line, i) => (
-              <div key={`${idx}-${i}`} className="text-center my-1">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{line || ''}</ReactMarkdown>
-              </div>
-            ));
-          } else if (block.type === 'row') {
-            return (
-              <div key={idx} className="flex flex-row justify-between my-1 w-full">
-                <div className="text-left flex-1">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.left || ''}</ReactMarkdown>
-                </div>
-                <div className="text-right flex-1">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.right || ''}</ReactMarkdown>
-                </div>
-              </div>
-            );
-          } else if (block.type === 'left') {
-            return (
-              <div key={idx} className="text-left my-1">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content || ''}</ReactMarkdown>
-              </div>
-            );
-          } else if (block.type === 'right') {
-            return (
-              <div key={idx} className="text-right my-1">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.right || ''}</ReactMarkdown>
-              </div>
-            );
-          } else {
-            return (
-              <div key={idx} className="w-full pl-0">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content || ''}</ReactMarkdown>
-              </div>
-            );
-          }
-        } catch (error) {
-          console.error(`渲染块 ${idx} 时出错:`, error, block);
+    const key = `${keyPrefix}${idx}`;
+
+    try {
+      // 处理嵌套内容的通用函数
+      const renderNestedContent = (nestedContent, alignClass) => {
+        if (Array.isArray(nestedContent)) {
+          return nestedContent.map((nestedBlock, nestedIdx) => 
+            renderBlock(nestedBlock, nestedIdx, `${key}-nested-`)
+          );
+        } else if (typeof nestedContent === 'string') {
           return (
-            <div key={idx} className="w-full pl-0 text-red-500 text-sm">
-              [渲染错误: {block.type}]
+            <div className={`${alignClass} my-1`}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{nestedContent || ''}</ReactMarkdown>
             </div>
           );
         }
-      })}
+        return null;
+      };
+
+      switch (block.type) {
+        case 'center':
+        case 'solocenter':
+          if (block.hasNested) {
+            return (
+              <div key={key} className="text-center my-1">
+                {renderNestedContent(block.content, 'text-center')}
+              </div>
+            );
+          } else {
+            const content = Array.isArray(block.content) ? block.content : [block.content];
+            return content.map((line, i) => (
+              <div key={`${key}-${i}`} className="text-center my-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{line || ''}</ReactMarkdown>
+              </div>
+            ));
+          }
+
+        case 'left':
+        case 'sololeft':
+          if (block.hasNested) {
+            return (
+              <div key={key} className="text-left my-1">
+                {renderNestedContent(block.content, 'text-left')}
+              </div>
+            );
+          } else {
+            const content = typeof block.content === 'string' ? block.content : 
+                           Array.isArray(block.content) ? block.content.join('') : '';
+            return (
+              <div key={key} className="text-left my-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content || ''}</ReactMarkdown>
+              </div>
+            );
+          }
+
+        case 'right':
+        case 'soloright':
+          if (block.hasNested) {
+            return (
+              <div key={key} className="text-right my-1">
+                {renderNestedContent(block.content, 'text-right')}
+              </div>
+            );
+          } else {
+            const content = typeof block.content === 'string' ? block.content : 
+                           Array.isArray(block.content) ? block.content.join('') : 
+                           block.right || '';
+            return (
+              <div key={key} className="text-right my-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content || ''}</ReactMarkdown>
+              </div>
+            );
+          }
+
+        case 'row':
+          return (
+            <div key={key} className="flex flex-row justify-between my-1 w-full">
+              <div className="text-left flex-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.left || ''}</ReactMarkdown>
+              </div>
+              <div className="text-right flex-1">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.right || ''}</ReactMarkdown>
+              </div>
+            </div>
+          );
+
+        case 'normal':
+        default:
+          return (
+            <div key={key} className="w-full pl-0">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content || ''}</ReactMarkdown>
+            </div>
+          );
+      }
+    } catch (error) {
+      console.error(`渲染块 ${idx} 时出错:`, error, block);
+      return (
+        <div key={key} className="w-full pl-0 text-red-500 text-sm">
+          [渲染错误: {block.type}]
+        </div>
+      );
+    }
+  };
+
+  return (
+    <div className="w-full pl-0">
+      {blocks.map((block, idx) => renderBlock(block, idx))}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 // 编辑栏组件，提供简历编辑相关功能，如字体设置、字号、行距设置、撤销/重做、样式切换等
 import React, { useState } from 'react';
 import Button from '../comcomponents/common/Button.jsx';
-import { Undo2, Redo2 } from 'lucide-react';
+import { Undo2, Redo2, Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import HistoryIcon from '../comcomponents/icons/Historyicon.jsx';
 import HistoryPanel from '../CVcomponents/HistoryPanel.jsx';
 import agentAPI from '../services/CVagentAPI.jsx';
@@ -28,13 +28,15 @@ export default function Editbar({
   theme,
   setTheme,
   onRestoreHistory,
-  previewRef // 新增：直接传递ref
+  previewRef, // 新增：直接传递ref
+  onMenuStateChange // 新增：菜单状态变化回调
 }) {
   console.log('=== Editbar组件渲染 ===');
   console.log('onSaveWord prop:', onSaveWord);
   console.log('onSavePDF prop:', onSavePDF);
   console.log('content prop:', content);
   console.log('previewRef:', previewRef);
+
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const themeOptions = [
     { key: 'style1', label: '样式1' },
@@ -137,6 +139,83 @@ export default function Editbar({
           className="hover:bg-gray-200 disabled:opacity-50 w-8 h-8 flex items-center justify-center"
         >
           <Redo2 size={16} />
+        </Button>
+      </div>
+
+      {/* 加粗按钮 */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <Button
+          onClick={() => {
+            // 派发加粗事件，让PreviewEditor监听并执行加粗操作
+            window.dispatchEvent(new Event('bold-selected-text'));
+          }}
+          type="ghost"
+          size="sm"
+          title="加粗选中文本 (Ctrl+B)"
+          aria-label="加粗"
+          className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
+        >
+          <Bold size={16} />
+        </Button>
+      </div>
+
+      {/* 斜体按钮 */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <Button
+          onClick={() => {
+            // 派发斜体事件，让PreviewEditor监听并执行斜体操作
+            window.dispatchEvent(new Event('italic-selected-text'));
+          }}
+          type="ghost"
+          size="sm"
+          title="斜体选中文本 (Ctrl+I)"
+          aria-label="斜体"
+          className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
+        >
+          <Italic size={16} />
+        </Button>
+      </div>
+
+      {/* 对齐按钮组 */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <Button
+          onClick={() => {
+            // 派发左对齐事件
+            window.dispatchEvent(new Event('align-left-selected-text'));
+          }}
+          type="ghost"
+          size="sm"
+          title="左对齐选中文本"
+          aria-label="左对齐"
+          className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
+        >
+          <AlignLeft size={16} />
+        </Button>
+        <Button
+          onClick={() => {
+            // 派发居中对齐事件
+            window.dispatchEvent(new Event('align-center-selected-text'));
+          }}
+          type="ghost"
+          size="sm"
+          title="居中对齐选中文本"
+          aria-label="居中对齐"
+          className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
+        >
+          <AlignCenter size={16} />
+        </Button>
+        <Button
+          onClick={() => {
+            // 派发右对齐事件
+            window.dispatchEvent(new Event('align-right-selected-text'));
+          }}
+          type="ghost"
+          size="sm"
+          title="右对齐选中文本"
+          aria-label="右对齐"
+          className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
+        >
+          <AlignRight size={16} />
         </Button>
       </div>
 

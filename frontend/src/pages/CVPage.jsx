@@ -24,6 +24,7 @@ const CVPage = () => {
   const [theme, setTheme] = useState('style1');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const previewRef = useRef();
+  const editorRef = useRef(); // 新增：PreviewEditor的ref
   const autoSaveManagerRef = useRef();
 
   const handleUpload = (data) => {
@@ -174,6 +175,8 @@ const CVPage = () => {
     }
   }, []);
 
+
+
   // 处理历史记录恢复
   const handleRestoreHistory = useCallback((historyItem) => {
     console.log('收到历史记录恢复请求:', historyItem);
@@ -267,7 +270,7 @@ const CVPage = () => {
           canRedo={historyIndex < history.length - 1}
           onUndo={handleUndo}
           onRedo={handleRedo}
-          currentTheme={theme}
+          theme={theme}
           setTheme={setTheme}
           onMenuStateChange={setIsMenuOpen}
           onRestoreHistory={handleRestoreHistory}
@@ -277,7 +280,13 @@ const CVPage = () => {
       {/* 编辑区 + 预览区 */}
       <div className="flex flex-1 overflow-hidden w-full" style={{ height: 'calc(100vh - 120px)' }}>
         <div className="w-2/5 h-full border-r border-gray-200 dark:border-gray-700 bg-gray-900" style={{ backgroundColor: '#111827', minHeight: '100%' }}>
-          <PreviewEditor content={editContent} onUpdate={handleRender} isLoading={isLoading} isMenuOpen={isMenuOpen} />
+          <PreviewEditor 
+            ref={editorRef}
+            content={editContent} 
+            onUpdate={handleRender} 
+            isLoading={isLoading} 
+            isMenuOpen={isMenuOpen} 
+          />
         </div>
         <div className="w-3/5 h-full overflow-auto bg-gray-50">
           <RenderPreview ref={previewRef} content={previewContent} config={config} resumeData={resumeData} theme={theme} setTheme={setTheme} />
