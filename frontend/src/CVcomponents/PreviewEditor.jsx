@@ -36,18 +36,18 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
     const toolbarWidth = aiPreview ? 500 : showPromptInput ? 400 : 280;
     const toolbarHeight = aiPreview ? 120 : showPromptInput ? 180 : 48;
     
-    // 边界约束（相对于容器）
+    // 边界约束（相对于视口，因为工具栏使用fixed定位）
     let x = newPosition.x;
     let y = newPosition.y;
     
-    // 水平边界约束 - 确保工具栏完全在容器内
-    const minX = 5;
-    const maxX = containerRect.width - toolbarWidth - 5;
+    // 水平边界约束 - 确保工具栏完全在编辑区域内
+    const minX = containerRect.left + 5;
+    const maxX = containerRect.right - toolbarWidth - 5;
     x = Math.max(minX, Math.min(x, maxX));
     
-    // 垂直边界约束 - 确保工具栏完全在容器内
-    const minY = 5;
-    const maxY = containerRect.height - toolbarHeight - 5;
+    // 垂直边界约束 - 确保工具栏完全在编辑区域内
+    const minY = containerRect.top + 5;
+    const maxY = containerRect.bottom - toolbarHeight - 5;
     y = Math.max(minY, Math.min(y, maxY));
     
     // 更新箭头位置
@@ -78,20 +78,20 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
       toolbarHeight = 180; // 增加高度以容纳选中文本显示
     }
     
-    // 计算相对于容器的位置（因为工具栏现在是absolute定位）
-    let y = spanRect.bottom - containerRect.top + 8;
-    if (y + toolbarHeight > containerRect.height - 10) {
-      y = spanRect.top - containerRect.top - toolbarHeight - 8;
+    // 计算相对于视口的位置（因为工具栏使用fixed定位）
+    let y = spanRect.bottom + 8;
+    if (y + toolbarHeight > containerRect.bottom - 10) {
+      y = spanRect.top - toolbarHeight - 8;
     }
-    let x = spanRect.left - containerRect.left + (spanRect.width / 2) - (toolbarWidth / 2);
+    let x = spanRect.left + (spanRect.width / 2) - (toolbarWidth / 2);
     
-    // 约束在编辑区容器内
-    const minX = 5;
-    const maxX = containerRect.width - toolbarWidth - 5;
+    // 约束在编辑区域内
+    const minX = containerRect.left + 5;
+    const maxX = containerRect.right - toolbarWidth - 5;
     x = Math.max(minX, Math.min(x, maxX));
-    y = Math.max(10, Math.min(y, containerRect.height - toolbarHeight - 10));
+    y = Math.max(containerRect.top + 10, Math.min(y, containerRect.bottom - toolbarHeight - 10));
     
-    const arrowLeft = `${spanRect.left - containerRect.left + (spanRect.width / 2) - x}px`;
+    const arrowLeft = `${spanRect.left + (spanRect.width / 2) - x}px`;
     return { x, y, arrowLeft };
   }, [showPromptInput, aiPreview]);
 

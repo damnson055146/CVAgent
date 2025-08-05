@@ -79,6 +79,7 @@ const SelectionToolbar = ({
       const newY = e.clientY - offsetY;
 
       // 直接更新位置，提高响应性
+      // 边界约束会在父组件的 handleToolbarPositionChange 中处理
       onPositionChange?.({ x: newX, y: newY, arrowLeft: '50%' });
     };
 
