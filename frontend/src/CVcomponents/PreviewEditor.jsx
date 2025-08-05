@@ -655,16 +655,47 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
             const hashMatch = originalLine.match(/^::: ?(sololeft|solocenter|soloright)(#.*)$/);
             const hashSuffix = hashMatch ? hashMatch[2] : '';
             
-            // 构建新的块
-            const newBlock = `\n::: ${alignmentType}${hashSuffix}\n${blockContent}\n:::\n`;
-            const newText = text.substring(0, blockStartPos) + newBlock + text.substring(blockEndPos);
+            // 构建新的块 - 不添加额外的换行符，保持原有格式
+            const newBlock = `::: ${alignmentType}${hashSuffix}\n${blockContent}\n:::`;
+            
+            // --- FIX START ---
+            // 修正空白行消失的问题 (参考ai_studio_code.js的逻辑)
+
+            // 1. 重新精确计算块的位置，避免连续操作时的累积误差
+            const lines = text.split('\n');
+            let actualBlockStart = 0;
+            let actualBlockEnd = 0;
+            
+            // 重新计算块开始位置
+            for (let i = 0; i < blockStartLine; i++) {
+              actualBlockStart += lines[i].length + 1;
+            }
+            
+            // 重新计算块结束位置
+            for (let i = 0; i <= blockEndLine; i++) {
+              actualBlockEnd += lines[i].length + 1;
+            }
+            actualBlockEnd -= 1; // 移除最后一个多余的换行符
+            
+            // 2. 从该位置开始，计算并跳过所有连续的换行符 (即空白行)
+            let preservedNewlines = '';
+            let posAfterNewlines = actualBlockEnd;
+            while (posAfterNewlines < text.length && text[posAfterNewlines] === '\n') {
+              preservedNewlines += '\n';
+              posAfterNewlines++;
+            }
+            
+            // 3. 使用重新计算的位置来重建文本
+            const textAfterBlock = text.substring(posAfterNewlines);
+            const newText = text.substring(0, actualBlockStart) + newBlock + preservedNewlines + textAfterBlock;
+            // --- FIX END ---
             
             setText(newText);
             onUpdate?.(newText);
             setTimeout(() => {
               textarea.focus();
-              // 将光标定位到新块的内容区域
-              const newContentStart = blockStartPos + `::: ${alignmentType}${hashSuffix}\n`.length;
+              // 将光标定位到新块的内容区域，使用重新计算的位置
+              const newContentStart = actualBlockStart + `::: ${alignmentType}${hashSuffix}\n`.length;
               const newContentEnd = newContentStart + blockContent.length;
               textarea.setSelectionRange(newContentStart, newContentEnd);
             }, 0);
@@ -757,6 +788,8 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
           blockType: existingBlock.blockType,
           blockStartLine: existingBlock.blockStartLine,
           blockEndLine: existingBlock.blockEndLine,
+          blockStart: existingBlock.blockStart,
+          blockEnd: existingBlock.blockEnd,
           totalLines: lines.length
         });
         
@@ -770,16 +803,56 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
         const hashMatch = originalLine.match(/^::: ?(left|right|center|sololeft|solocenter|soloright)(#.*)$/);
         const hashSuffix = hashMatch ? hashMatch[2] : '';
         
-        // 构建新的块
-        const newBlock = `\n::: ${alignmentType}${hashSuffix}\n${blockContent}\n:::\n`;
-        const newText = text.substring(0, existingBlock.blockStart) + newBlock + text.substring(existingBlock.blockEnd);
+        // 构建新的块 - 不添加额外的换行符，保持原有格式
+        const newBlock = `::: ${alignmentType}${hashSuffix}\n${blockContent}\n:::`;
+        
+        // --- FIX START ---
+        // 修正空白行消失的问题 (参考ai_studio_code.js的逻辑)
+
+        // 1. 重新精确计算块的位置，避免连续操作时的累积误差
+        let actualBlockStart = 0;
+        let actualBlockEnd = 0;
+        
+        // 重新计算块开始位置
+        for (let i = 0; i < existingBlock.blockStartLine; i++) {
+          actualBlockStart += lines[i].length + 1;
+        }
+        
+        // 重新计算块结束位置
+        for (let i = 0; i <= existingBlock.blockEndLine; i++) {
+          actualBlockEnd += lines[i].length + 1;
+        }
+        actualBlockEnd -= 1; // 移除最后一个多余的换行符
+        
+        // 2. 从该位置开始，计算并跳过所有连续的换行符 (即空白行)
+        let preservedNewlines = '';
+        let posAfterNewlines = actualBlockEnd;
+        while (posAfterNewlines < text.length && text[posAfterNewlines] === '\n') {
+          preservedNewlines += '\n';
+          posAfterNewlines++;
+        }
+        
+        console.log('替换范围:', {
+          originalStart: existingBlock.blockStart,
+          actualBlockStart,
+          originalEnd: existingBlock.blockEnd,
+          actualBlockEnd,
+          posAfterNewlines,
+          preservedNewlinesLength: preservedNewlines.length,
+          newBlockLength: newBlock.length
+        });
+        
+        // 3. 使用重新计算的位置来重建文本
+        const textAfterBlock = text.substring(posAfterNewlines);
+        const newText = text.substring(0, actualBlockStart) + newBlock + preservedNewlines + textAfterBlock;
+        // --- FIX END ---
         
         setText(newText);
         onUpdate?.(newText);
         setTimeout(() => {
           textarea.focus();
-          // 将光标定位到新块的内容区域
-          const newContentStart = existingBlock.blockStart + `::: ${alignmentType}${hashSuffix}\n`.length;
+          // 将光标定位到新块的内容区域，使用重新计算的位置
+          const newContentStart = actualBlockStart + `::: ${alignmentType}${hashSuffix}\n`.length;
           const newContentEnd = newContentStart + blockContent.length;
           textarea.setSelectionRange(newContentStart, newContentEnd);
         }, 0);
@@ -835,8 +908,22 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
       }
       
       // **修复7：创建新的对齐块**
+      // 智能处理换行符，避免添加多余的换行
+      let prefix = '';
+      let suffix = '';
+      
+      // 检查前面是否需要换行
+      if (expandedStart > 0 && text[expandedStart - 1] !== '\n') {
+        prefix = '\n';
+      }
+      
+      // 检查后面是否需要换行
+      if (expandedEnd < text.length && text[expandedEnd] !== '\n') {
+        suffix = '\n';
+      }
+      
       const newText = text.substring(0, expandedStart) + 
-                     `\n::: ${alignmentType}\n${expandedContent}\n:::\n` + 
+                     `${prefix}::: ${alignmentType}\n${expandedContent}\n:::${suffix}` + 
                      text.substring(expandedEnd);
       
       setText(newText);
@@ -844,7 +931,7 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
       setTimeout(() => {
         textarea.focus();
         // 将光标定位到新创建的对齐内容
-        const newContentStart = expandedStart + `::: ${alignmentType}\n`.length;
+        const newContentStart = expandedStart + prefix.length + `::: ${alignmentType}\n`.length;
         const newContentEnd = newContentStart + expandedContent.length;
         textarea.setSelectionRange(newContentStart, newContentEnd);
       }, 0);

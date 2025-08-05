@@ -142,6 +142,9 @@ export default function Editbar({
         </Button>
       </div>
 
+      {/* 分隔线 */}
+      <div className="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-2 flex-shrink-0"></div>
+
       {/* 加粗按钮 */}
       <div className="flex items-center gap-1 flex-shrink-0">
         <Button
@@ -155,7 +158,7 @@ export default function Editbar({
           aria-label="加粗"
           className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
         >
-          <Bold size={16} />
+          <Bold size={25} />
         </Button>
       </div>
 
@@ -172,7 +175,7 @@ export default function Editbar({
           aria-label="斜体"
           className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
         >
-          <Italic size={16} />
+          <Italic size={10} />
         </Button>
       </div>
 
@@ -189,7 +192,7 @@ export default function Editbar({
           aria-label="左对齐"
           className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
         >
-          <AlignLeft size={16} />
+          <AlignLeft size={25} />
         </Button>
         <Button
           onClick={() => {
@@ -202,7 +205,7 @@ export default function Editbar({
           aria-label="居中对齐"
           className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
         >
-          <AlignCenter size={16} />
+          <AlignCenter size={25} />
         </Button>
         <Button
           onClick={() => {
@@ -215,7 +218,7 @@ export default function Editbar({
           aria-label="右对齐"
           className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center"
         >
-          <AlignRight size={16} />
+          <AlignRight size={25} />
         </Button>
       </div>
 
