@@ -915,6 +915,174 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
           }));
         }
         
+      } else if (block.type === 'sololeft') {
+        const text = block.content || '';
+        if (text) {
+          // 检查是否包含标题格式
+          const headingMatch = text.match(/^(#+)\s*(.+)$/);
+          if (headingMatch) {
+            const level = headingMatch[1].length;
+            const headingText = headingMatch[2];
+            let headingStyle;
+            if (level === 1) {
+              headingStyle = styleConfig.h1;
+            } else if (level === 2) {
+              headingStyle = styleConfig.h2;
+            } else {
+              headingStyle = styleConfig.h3;
+            }
+
+            const paragraphOptions = {
+              alignment: AlignmentType.LEFT,
+              spacing: headingStyle.spacing,
+            };
+
+            if (level === 2 && headingStyle.border) {
+              paragraphOptions.border = {
+                bottom: {
+                  color: headingStyle.border.bottom.color,
+                  space: 1,
+                  value: 'single',
+                  size: headingStyle.border.bottom.size,
+                }
+              };
+              paragraphOptions.spacing.after = (paragraphOptions.spacing.after || 0) + 120;
+            }
+            
+            children.push(new Paragraph({
+              ...paragraphOptions,
+              children: [
+                new TextRun({
+                  text: headingText,
+                  size: headingStyle.fontSize,
+                  font: styleConfig.baseFont,
+                  bold: headingStyle.bold,
+                  color: headingStyle.color
+                })
+              ]
+            }));
+          } else {
+            const textRuns = parseInlineFormatting(text, styleConfig);
+            children.push(new Paragraph({
+              alignment: AlignmentType.LEFT,
+              spacing: { after: 200 },
+              children: textRuns
+            }));
+          }
+        }
+        
+      } else if (block.type === 'solocenter') {
+        const text = block.content || '';
+        if (text) {
+          // 检查是否包含标题格式
+          const headingMatch = text.match(/^(#+)\s*(.+)$/);
+          if (headingMatch) {
+            const level = headingMatch[1].length;
+            const headingText = headingMatch[2];
+            let headingStyle;
+            if (level === 1) {
+              headingStyle = styleConfig.h1;
+            } else if (level === 2) {
+              headingStyle = styleConfig.h2;
+            } else {
+              headingStyle = styleConfig.h3;
+            }
+
+            const paragraphOptions = {
+              alignment: AlignmentType.CENTER,
+              spacing: headingStyle.spacing,
+            };
+
+            if (level === 2 && headingStyle.border) {
+              paragraphOptions.border = {
+                bottom: {
+                  color: headingStyle.border.bottom.color,
+                  space: 1,
+                  value: 'single',
+                  size: headingStyle.border.bottom.size,
+                }
+              };
+              paragraphOptions.spacing.after = (paragraphOptions.spacing.after || 0) + 120;
+            }
+            
+            children.push(new Paragraph({
+              ...paragraphOptions,
+              children: [
+                new TextRun({
+                  text: headingText,
+                  size: headingStyle.fontSize,
+                  font: styleConfig.baseFont,
+                  bold: headingStyle.bold,
+                  color: headingStyle.color
+                })
+              ]
+            }));
+          } else {
+            const textRuns = parseInlineFormatting(text, styleConfig);
+            children.push(new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+              children: textRuns
+            }));
+          }
+        }
+        
+      } else if (block.type === 'soloright') {
+        const text = block.content || '';
+        if (text) {
+          // 检查是否包含标题格式
+          const headingMatch = text.match(/^(#+)\s*(.+)$/);
+          if (headingMatch) {
+            const level = headingMatch[1].length;
+            const headingText = headingMatch[2];
+            let headingStyle;
+            if (level === 1) {
+              headingStyle = styleConfig.h1;
+            } else if (level === 2) {
+              headingStyle = styleConfig.h2;
+            } else {
+              headingStyle = styleConfig.h3;
+            }
+
+            const paragraphOptions = {
+              alignment: AlignmentType.RIGHT,
+              spacing: headingStyle.spacing,
+            };
+
+            if (level === 2 && headingStyle.border) {
+              paragraphOptions.border = {
+                bottom: {
+                  color: headingStyle.border.bottom.color,
+                  space: 1,
+                  value: 'single',
+                  size: headingStyle.border.bottom.size,
+                }
+              };
+              paragraphOptions.spacing.after = (paragraphOptions.spacing.after || 0) + 120;
+            }
+            
+            children.push(new Paragraph({
+              ...paragraphOptions,
+              children: [
+                new TextRun({
+                  text: headingText,
+                  size: headingStyle.fontSize,
+                  font: styleConfig.baseFont,
+                  bold: headingStyle.bold,
+                  color: headingStyle.color
+                })
+              ]
+            }));
+          } else {
+            const textRuns = parseInlineFormatting(text, styleConfig);
+            children.push(new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              spacing: { after: 200 },
+              children: textRuns
+            }));
+          }
+        }
+        
       } else {
         const text = block.content || '';
         if (typeof text === 'string' && text.trim()) {
@@ -1400,14 +1568,26 @@ function renderStyledLine(doc, text, x, y, style, strongStyle) {
   const NORMAL_COLOR = Array.isArray(style.color) ? style.color : [0,0,0];
   const STRONG_COLOR = Array.isArray(strongStyle.color) ? strongStyle.color : [34, 34, 59];
 
-  const parts = text.split(/(\*\*.*?\*\*)/g).filter(p => p);
+  // 处理粗体和斜体格式
+  const parts = text.split(/(\*\*.*?\*\*|(?<!\*)\*[^*]+\*(?!\*))/g).filter(p => p);
   let currentX = x;
 
   parts.forEach(part => {
     const isBold = part.startsWith('**') && part.endsWith('**');
-    const partText = isBold ? part.slice(2, -2) : part;
+    const isItalic = !isBold && part.startsWith('*') && part.endsWith('*') && !part.startsWith('**');
+    
+    let partText = part;
+    let fontStyle = 'normal';
+    
+    if (isBold) {
+      partText = part.slice(2, -2);
+      fontStyle = 'bold';
+    } else if (isItalic) {
+      partText = part.slice(1, -1);
+      fontStyle = 'italic';
+    }
 
-    doc.setFont(FONT_NAME, isBold ? 'bold' : 'normal');
+    doc.setFont(FONT_NAME, fontStyle);
     doc.setTextColor(...(isBold ? STRONG_COLOR : NORMAL_COLOR));
 
     try {
@@ -1431,14 +1611,26 @@ function renderStyledLineCentered(doc, text, x, y, style, strongStyle) {
   const NORMAL_COLOR = Array.isArray(style.color) ? style.color : [0,0,0];
   const STRONG_COLOR = Array.isArray(strongStyle.color) ? strongStyle.color : [34, 34, 59];
 
-  const parts = text.split(/(\*\*.*?\*\*)/g).filter(p => p);
+  // 处理粗体和斜体格式
+  const parts = text.split(/(\*\*.*?\*\*|(?<!\*)\*[^*]+\*(?!\*))/g).filter(p => p);
   let currentX = x;
 
   parts.forEach(part => {
     const isBold = part.startsWith('**') && part.endsWith('**');
-    const partText = isBold ? part.slice(2, -2) : part;
+    const isItalic = !isBold && part.startsWith('*') && part.endsWith('*') && !part.startsWith('**');
+    
+    let partText = part;
+    let fontStyle = 'normal';
+    
+    if (isBold) {
+      partText = part.slice(2, -2);
+      fontStyle = 'bold';
+    } else if (isItalic) {
+      partText = part.slice(1, -1);
+      fontStyle = 'italic';
+    }
 
-    doc.setFont(FONT_NAME, isBold ? 'bold' : 'normal');
+    doc.setFont(FONT_NAME, fontStyle);
     doc.setTextColor(...(isBold ? STRONG_COLOR : NORMAL_COLOR));
 
     try {
@@ -1694,6 +1886,189 @@ const generateTextualPdf = async (content, config, resumeData) => {
             }
           }
           yPos += style.spacing.after;
+      }
+      else if (block.type === 'sololeft') {
+          const text = block.content || '';
+          if (text) {
+            // 检查是否包含标题格式
+            const headingMatch = text.match(/^(#+)\s*(.+)$/);
+            if (headingMatch) {
+              const level = headingMatch[1].length;
+              const headingText = headingMatch[2];
+              
+              let headingStyle;
+              if (level === 1) headingStyle = styleConfig.h1;
+              else if (level === 2) headingStyle = styleConfig.h2;
+              else headingStyle = styleConfig.h3;
+              
+              yPos += (headingStyle.spacing.before || 0);
+              yPos = checkPageBreak(yPos);
+              
+              doc.setFont(FONT_NAME, headingStyle.bold ? 'bold' : 'normal');
+              doc.setFontSize(headingStyle.fontSize);
+              doc.setTextColor(...headingStyle.color);
+              
+              const textLines = doc.splitTextToSize(headingText, CONTENT_WIDTH);
+              doc.text(textLines, PAGE_MARGIN, yPos);
+              
+              const textHeight = textLines.length * ptToMm(headingStyle.fontSize) * (headingStyle.lineHeight || 1.2);
+              yPos += textHeight;
+              
+              // 处理H2下划线
+              if (level === 2 && headingStyle.border) {
+                  const paddingBottomMm = ptToMm(styleConfig.baseFontSize) * 0.4;
+                  const underlineY = yPos + paddingBottomMm;
+
+                  yPos = checkPageBreak(underlineY, headingStyle.border.bottom.width);
+
+                  doc.setDrawColor(...headingStyle.border.bottom.color);
+                  doc.setLineWidth(headingStyle.border.bottom.width);
+                  doc.line(PAGE_MARGIN, underlineY, A4_WIDTH_MM - PAGE_MARGIN, underlineY);
+                  yPos = underlineY + 0.5;
+              }
+              
+              yPos += headingStyle.spacing.after;
+            } else {
+              const style = styleConfig.paragraph;
+              yPos += (style.spacing.before || 0);
+              yPos = checkPageBreak(yPos);
+              
+              doc.setFont(FONT_NAME, 'normal');
+              doc.setFontSize(style.fontSize);
+              
+              const textLines = doc.splitTextToSize(text, CONTENT_WIDTH);
+              for (const line of textLines) {
+                  yPos = checkPageBreak(yPos, ptToMm(style.fontSize));
+                  renderStyledLine(doc, line, PAGE_MARGIN, yPos, style, styleConfig.strong);
+                  yPos += ptToMm(style.fontSize) * style.lineHeight;
+              }
+              yPos += style.spacing.after;
+            }
+          }
+      }
+      else if (block.type === 'solocenter') {
+          const text = block.content || '';
+          if (text) {
+            // 检查是否包含标题格式
+            const headingMatch = text.match(/^(#+)\s*(.+)$/);
+            if (headingMatch) {
+              const level = headingMatch[1].length;
+              const headingText = headingMatch[2];
+              
+              let headingStyle;
+              if (level === 1) headingStyle = styleConfig.h1;
+              else if (level === 2) headingStyle = styleConfig.h2;
+              else headingStyle = styleConfig.h3;
+              
+              yPos += (headingStyle.spacing.before || 0);
+              yPos = checkPageBreak(yPos);
+              
+              doc.setFont(FONT_NAME, headingStyle.bold ? 'bold' : 'normal');
+              doc.setFontSize(headingStyle.fontSize);
+              doc.setTextColor(...headingStyle.color);
+              
+              const textLines = doc.splitTextToSize(headingText, CONTENT_WIDTH);
+              doc.text(textLines, A4_WIDTH_MM / 2, yPos, { align: 'center' });
+              
+              const textHeight = textLines.length * ptToMm(headingStyle.fontSize) * (headingStyle.lineHeight || 1.2);
+              yPos += textHeight;
+              
+              // 处理H2下划线
+              if (level === 2 && headingStyle.border) {
+                  const paddingBottomMm = ptToMm(styleConfig.baseFontSize) * 0.4;
+                  const underlineY = yPos + paddingBottomMm;
+
+                  yPos = checkPageBreak(underlineY, headingStyle.border.bottom.width);
+
+                  doc.setDrawColor(...headingStyle.border.bottom.color);
+                  doc.setLineWidth(headingStyle.border.bottom.width);
+                  doc.line(PAGE_MARGIN, underlineY, A4_WIDTH_MM - PAGE_MARGIN, underlineY);
+                  yPos = underlineY + 0.5;
+              }
+              
+              yPos += headingStyle.spacing.after;
+            } else {
+              const style = styleConfig.paragraph;
+              yPos += (style.spacing.before || 0);
+              yPos = checkPageBreak(yPos);
+              
+              doc.setFont(FONT_NAME, 'normal');
+              doc.setFontSize(style.fontSize);
+              
+              const textLines = doc.splitTextToSize(text, CONTENT_WIDTH);
+              for (const textLine of textLines) {
+                  yPos = checkPageBreak(yPos, ptToMm(style.fontSize));
+                  const textWidth = doc.getTextWidth(textLine);
+                  const centerX = (A4_WIDTH_MM - textWidth) / 2;
+                  renderStyledLineCentered(doc, textLine, centerX, yPos, style, styleConfig.strong);
+                  yPos += ptToMm(style.fontSize) * style.lineHeight;
+              }
+              yPos += style.spacing.after;
+            }
+          }
+      }
+      else if (block.type === 'soloright') {
+          const text = block.content || '';
+          if (text) {
+            // 检查是否包含标题格式
+            const headingMatch = text.match(/^(#+)\s*(.+)$/);
+            if (headingMatch) {
+              const level = headingMatch[1].length;
+              const headingText = headingMatch[2];
+              
+              let headingStyle;
+              if (level === 1) headingStyle = styleConfig.h1;
+              else if (level === 2) headingStyle = styleConfig.h2;
+              else headingStyle = styleConfig.h3;
+              
+              yPos += (headingStyle.spacing.before || 0);
+              yPos = checkPageBreak(yPos);
+              
+              doc.setFont(FONT_NAME, headingStyle.bold ? 'bold' : 'normal');
+              doc.setFontSize(headingStyle.fontSize);
+              doc.setTextColor(...headingStyle.color);
+              
+              const textLines = doc.splitTextToSize(headingText, CONTENT_WIDTH);
+              const textWidth = doc.getTextWidth(headingText);
+              const rightX = A4_WIDTH_MM - PAGE_MARGIN - textWidth;
+              doc.text(textLines, rightX, yPos);
+              
+              const textHeight = textLines.length * ptToMm(headingStyle.fontSize) * (headingStyle.lineHeight || 1.2);
+              yPos += textHeight;
+              
+              // 处理H2下划线
+              if (level === 2 && headingStyle.border) {
+                  const paddingBottomMm = ptToMm(styleConfig.baseFontSize) * 0.4;
+                  const underlineY = yPos + paddingBottomMm;
+
+                  yPos = checkPageBreak(underlineY, headingStyle.border.bottom.width);
+
+                  doc.setDrawColor(...headingStyle.border.bottom.color);
+                  doc.setLineWidth(headingStyle.border.bottom.width);
+                  doc.line(PAGE_MARGIN, underlineY, A4_WIDTH_MM - PAGE_MARGIN, underlineY);
+                  yPos = underlineY + 0.5;
+              }
+              
+              yPos += headingStyle.spacing.after;
+            } else {
+              const style = styleConfig.paragraph;
+              yPos += (style.spacing.before || 0);
+              yPos = checkPageBreak(yPos);
+              
+              doc.setFont(FONT_NAME, 'normal');
+              doc.setFontSize(style.fontSize);
+              
+              const textLines = doc.splitTextToSize(text, CONTENT_WIDTH);
+              for (const line of textLines) {
+                  yPos = checkPageBreak(yPos, ptToMm(style.fontSize));
+                  const textWidth = doc.getTextWidth(line);
+                  const rightX = A4_WIDTH_MM - PAGE_MARGIN - textWidth;
+                  renderStyledLine(doc, line, rightX, yPos, style, styleConfig.strong);
+                  yPos += ptToMm(style.fontSize) * style.lineHeight;
+              }
+              yPos += style.spacing.after;
+            }
+          }
       }
       else if (block.type === 'normal' && block.content && block.content.trim()) {
         const text = block.content.trim();
