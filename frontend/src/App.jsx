@@ -1,8 +1,8 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Sidebar from './comcomponents/Sidebar';
-import CVPage from './pages/CVPage.jsx';
+import Sidebar from './Comcomponents/Sidebar';
+import CVPage from './pages/CVpage.jsx';
 import PSGenerator from './pages/PSGenerator.jsx';
 import RecGenerator from './pages/RecGenerator.jsx';
 import LandingPage from './pages/LandingPage.jsx';

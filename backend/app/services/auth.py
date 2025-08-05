@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status, Cookie, Header
+from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import uuid
@@ -88,7 +88,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
     
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
     if user is None:
         raise credentials_exception
     return user
@@ -122,7 +122,7 @@ async def get_current_user_from_cookie(
             detail="Invalid token"
         )
     
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -134,33 +134,15 @@ def calculate_checksum(content: str) -> str:
     """计算内容的SHA256校验和"""
     return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
-def get_token_from_header(authorization: str = Header(None)):
-    """从Authorization header获取token"""
-    if authorization and authorization.startswith("Bearer "):
-        return authorization[7:]  # 移除 "Bearer " 前缀
-    return None
-
 async def get_current_user_flexible(
-    token: str = Depends(get_token_from_header),
+    token: str = Depends(oauth2_scheme),
     cookie_token: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
     """支持Authorization header和cookie两种方式的用户认证"""
     # 优先使用Authorization header
     if token:
-        # 处理测试用户的硬编码token
-        if token == "test-token":
-            # 返回测试用户信息
-            return type('TestUser', (), {
-                'id': 'test-id',
-                'username': 'testuser',
-                'email': 'testuser@example.com',
-                'role': 'guest',
-                'is_active': True,
-                'created_at': datetime.utcnow()
-            })()
-        else:
-            return await get_current_user(token, db)
+        return await get_current_user(token, db)
     # 如果没有Authorization header，尝试使用cookie
     elif cookie_token:
         return await get_current_user_from_cookie(cookie_token, db)

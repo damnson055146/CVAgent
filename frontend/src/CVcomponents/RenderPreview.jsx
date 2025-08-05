@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { createRoot } from 'react-dom/client';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import Button from '../comcomponents/common/Button.jsx';
+import Button from '../Comcomponents/common/Button.jsx';
 import { convertJsonToMarkdown } from '../utils/resumeUtils.jsx';
 
 // --- Helper Function ---

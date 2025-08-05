@@ -1,9 +1,9 @@
 // src/CVcomponents/Editbar.jsx
 // 编辑栏组件，提供简历编辑相关功能，如字体设置、字号、行距设置、撤销/重做、样式切换等
 import React, { useState } from 'react';
-import Button from '../comcomponents/common/Button.jsx';
+import Button from '../Comcomponents/common/Button.jsx';
 import { Undo2, Redo2 } from 'lucide-react';
-import HistoryIcon from '../comcomponents/icons/Historyicon.jsx';
+import HistoryIcon from '../Comcomponents/icons/Historyicon.jsx';
 import HistoryPanel from '../CVcomponents/HistoryPanel.jsx';
 import agentAPI from '../services/CVagentAPI.jsx';
 import { createHistoryItem, saveHistoryItem } from '../utils/historyUtils.js';

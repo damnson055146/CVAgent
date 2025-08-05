@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Send, FileText, Edit3, Loader2 } from 'lucide-react';
-import Styleswitch from '../comcomponents/icons/Styleswitch';
-import ModelSelector from '../comcomponents/common/ModelSelector';
+import Styleswitch from '../Comcomponents/icons/Styleswitch';
+import ModelSelector from '../Comcomponents/common/ModelSelector';
 import { generatePersonalStatement } from '../services/PSagentAPI';
 // Button
 const Button = ({ children, type, size, className, onClick, disabled }) => {

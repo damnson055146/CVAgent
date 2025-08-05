@@ -1,8 +1,17 @@
-
-
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import uuid
+
+from uuid import UUID
+from enum import Enum
+
+
+
+
+
+
+
 
 # --- 认证相关模型 ---
 class UserCreate(BaseModel):
@@ -92,3 +101,161 @@ class NewResumeProfile(BaseModel):
     user_research_experience: Optional[List[ResearchItem]] = []
     user_extracurricular_activities: Optional[List[ActivityItem]] = []
     user_target: Optional[str] = None
+
+class APIDocType(str, Enum):
+    """API层面的文档类型枚举。"""
+    resume = "resume"
+    personal_statement = "personal_statement"
+    recommendation = "recommendation"
+
+class DocumentTypeEnum(str, Enum):
+    resume             = "resume"
+    personal_statement = "personal_statement"
+    recommendation     = "recommendation"
+
+class UserDocQuery(BaseModel):
+    """用于需要用户ID的请求体的模式。"""
+    user_id: uuid.UUID
+
+
+# class DocumentVersionHistoryItem(BaseModel):
+#     """用于文档历史记录列表项的模式。"""
+#     id: uuid.UUID
+#     version_number: int
+#     created_at: datetime
+#     content_snippet: str
+
+# --- 新增 Schema 用于历史记录列表 ---
+class DocumentVersionHistoryItem(BaseModel):
+    id: UUID
+    version_number: int
+    created_at: datetime
+    content_snippet: str  # 返回内容摘要，而不是全文
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+# class DocumentVersionContent(BaseModel):
+#     """用于返回版本完整内容的模式。"""
+#     id: uuid.UUID
+#     content: str
+#
+#     class Config:
+#         from_attributes = True
+
+# --- 新增 Schema 用于返回单个版本的完整内容 ---
+class DocumentVersionContent(BaseModel):
+    id: UUID
+    content: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class TokenResponse(BaseModel):
+    # access_token: str
+    access_token: UUID
+    token_type: str = "bearer"
+
+    model_config = {
+        "from_attributes": True
+    }
+
+# class DocumentSave(BaseModel):
+#     """用于保存文档内容的输入模式。"""
+#     user_id: uuid.UUID
+#     content_md: str
+
+# 请求体
+class DocumentSave(BaseModel):
+    user_id: UUID
+    content_md: str = Field(..., min_length=1)
+
+    model_config = {
+        "populate_by_name": True
+    }
+
+# 响应体：包含文档元信息和当前版本内容
+# class DocumentWithContent(BaseModel):
+#     id: UUID
+#     user_id: UUID
+#     type: DocumentTypeEnum
+#     current_version_id: UUID
+#     content_md: str
+#     created_at: datetime
+#     updated_at: datetime
+#
+#     model_config = {
+#         "from_attributes": True
+#     }
+
+class DocumentWithContent(BaseModel):
+    """用于返回文档及其当前版本内容的模式。"""
+    id: uuid.UUID
+    user_id: uuid.UUID
+    type: str # 直接使用 str，因为枚举对象无法直接JSON序列化
+    current_version_id: Optional[uuid.UUID] = None
+    content_md: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentListItem(BaseModel):
+    """用于返回文档列表项的模式。"""
+    id: uuid.UUID
+    user_id: uuid.UUID
+    type: str
+    title: str
+    current_version_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# class UserCreate(BaseModel):
+#     email: EmailStr
+#     password_hash: str = Field(..., min_length=40, max_length=255)
+#     role: str = Field('guest', pattern=r'^(guest|vvip|consultant|etc\.\.)$')
+#     status: int = Field(1, ge=0, le=2)
+#     failed_login_attempts: int = 0
+#     locked_until: datetime | None = None
+#     last_login_at: datetime | None = None
+#     deleted_at: datetime | None = None
+#     user_metadata: dict = Field(default_factory=dict, alias="metadata")
+#
+#     model_config = {
+#         "populate_by_name": True
+#     }
+#
+# class UserResponse(BaseModel):
+#     id: UUID
+#     email: EmailStr
+#     role: str
+#     status: int
+#     failed_login_attempts: int
+#     locked_until: datetime | None
+#     last_login_at: datetime | None
+#     created_at: datetime
+#     updated_at: datetime
+#     deleted_at: datetime | None
+#     user_metadata: dict = Field(..., alias="metadata")
+#
+#     model_config = {
+#         "from_attributes": True,
+#         "populate_by_name": True
+#     }
+
+# 请求体，只要 user_id
+
+#
+# # 用户登录请求和响应
+# class UserLogin(BaseModel):
+#     email: EmailStr
+#     password_hash: str = Field(..., min_length=40, max_length=255)

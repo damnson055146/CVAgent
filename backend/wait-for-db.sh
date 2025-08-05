@@ -1,13 +1,16 @@
 #!/bin/bash
 
-# 等待PostgreSQL数据库启动
-echo "等待PostgreSQL数据库启动..."
-until pg_isready -h postgres -p 5432 -U postgres; do
-  echo "数据库未就绪，等待..."
-  sleep 2
+# 等待数据库启动的脚本
+set -e
+
+host="$1"
+shift
+cmd="$@"
+
+until PGPASSWORD=$POSTGRES_PASSWORD psql -h "$host" -U "postgres" -d "aiagent" -c '\q'; do
+  >&2 echo "Postgres is unavailable - sleeping"
+  sleep 1
 done
 
-echo "数据库已就绪，启动应用..."
-
-# 执行传入的命令
-exec "$@" 
+>&2 echo "Postgres is up - executing command"
+exec $cmd 

@@ -129,6 +129,18 @@ async def generate_recommendation(input_data: TextInput):
         raise HTTPException(status_code=500, detail=f"生成推荐信时发生内部错误: {e}")
 
 
+@router.post("/name-document/")
+async def name_document(input_data: TextInput):
+    """
+    接收Markdown格式的文本，调用Dify为其生成一个合适的标题。
+    """
+    try:
+        document_name = await run_in_threadpool(dify_client.name_document, input_data.text)
+        return JSONResponse(content={"document_name": document_name})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"为文档命名时发生内部错误: {e}")
+
+
 # 本地缓存API
 @router.post("/api/documents_save/{doc_type}")
 async def save_document_endpoint(doc_type: str, payload: Dict[str, Any]):

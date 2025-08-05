@@ -1,142 +1,225 @@
 import uuid
-import datetime
-from uuid import UUID
 from sqlalchemy.orm import Session
-from app import model, schemas
-from app.model import Document, DocumentVersion, User
-from app.schemas import (
-    DocumentSave,
-    DocumentWithContent,
-    DocumentTypeEnum,
-    UserCreate,
-    UserLogin,
-    APIDocType,
-)
 
-# —— 映射表 —— #
-API_TO_DB: dict[DocumentTypeEnum, str] = {
-    DocumentTypeEnum.resume:             "resume",
-    DocumentTypeEnum.personal_statement: "personal_statement",
-    DocumentTypeEnum.recommendation:     "recommendation",
-}
+# 导入分离的模型和模式
+from app.models import document_models, user_models,schemas
 
-DB_TO_API: dict[str, DocumentTypeEnum] = {
-    db_val: api_val for api_val, db_val in API_TO_DB.items()
-}
 
-def create_user(db: Session, user_in: schemas.UserCreate) -> model.User:
-    u = model.User(
-        email=user_in.email,
-        password_hash=user_in.password_hash,
-        role=user_in.role,
-        status=user_in.status,
-        failed_login_attempts=user_in.failed_login_attempts,
-        locked_until=user_in.locked_until,
-        last_login_at=user_in.last_login_at,
-        deleted_at=user_in.deleted_at,
-        metadata=user_in.user_metadata,
-    )
-    db.add(u)
-    db.commit()
-    db.refresh(u)
-    return u
-
-def authenticate_user(db: Session, email: str, password_hash: str) -> model.User | None:
-    # 1) 按 email 查用户
-    user = db.query(model.User).filter_by(email=email).first()
-    if not user:
-        return None
-
-    # 2) 比对密码
-    if user.password_hash != password_hash:
-        return None
-
-    # 3) 生成一个新的 refresh_token（或 access_token）
-    token = str(uuid.uuid4())
-    user.refresh_token = token
-    user.last_login_at = datetime.datetime.utcnow()
-
-    db.commit()
-    db.refresh(user)
-    return user
 
 def save_document(
-    db: Session,
-    payload: DocumentSave,
-    doc_type: DocumentTypeEnum
-) -> tuple[Document, DocumentVersion]:
-    # 1) 映射到 DB enum
-    db_type = API_TO_DB[doc_type]
-
-    # 2) 查询 documents
+        db: Session,
+        payload: schemas.DocumentSave,
+        doc_type: schemas.APIDocType
+) -> tuple[document_models.Document, document_models.DocumentVersion]:
+    """
+    保存一个新的文档版本。如果文档不存在，则先创建文档。
+    """
+    # 1. 查找或创建父文档
     doc = (
-        db.query(Document)
-          .filter_by(user_id=payload.user_id, type=db_type)
-          .first()
+        db.query(document_models.Document)
+        .filter_by(user_id=payload.user_id, type=doc_type.value)
+        .first()
     )
+
     if not doc:
-        doc = Document(
-            id=uuid.uuid4(),
+        doc = document_models.Document(
             user_id=payload.user_id,
-            type=db_type,
-            current_version_id=None
+            type=doc_type.value,
+            title=f"{doc_type.value.capitalize()} for user {payload.user_id}"  # 可以设置一个默认标题
         )
         db.add(doc)
-        db.flush()
+        db.flush()  # 刷新以获取 doc.id
 
-    # 3) 下一个版本号
+    # 2. 计算下一个版本号（排除已删除的版本）
+    # 注意：在高并发场景下，这里可能需要更健壮的逻辑
     count = (
-        db.query(DocumentVersion)
-          .filter_by(document_id=doc.id)
-          .count()
+        db.query(document_models.DocumentVersion)
+        .filter(
+            document_models.DocumentVersion.document_id == doc.id,
+            document_models.DocumentVersion.deleted_at.is_(None)
+        )
+        .count()
     )
     next_ver = count + 1
 
-    # 4) 插入新版本
-    ver = DocumentVersion(
-        id=uuid.uuid4(),
+    # 3. 创建并插入新版本
+    ver = document_models.DocumentVersion(
         document_id=doc.id,
         version_number=next_ver,
         content=payload.content_md,
         created_by=payload.user_id
     )
     db.add(ver)
-    db.flush()
+    db.flush()  # 刷新以获取 ver.id
 
-    # 5) 更新 current_version_id
+    # 4. 更新文档的 current_version_id
     doc.current_version_id = ver.id
+    db.add(doc)
 
+    # 5. 提交事务
     db.commit()
     db.refresh(doc)
     db.refresh(ver)
 
     return doc, ver
 
-def get_current_doc_with_content(
-    db: Session,
-    user_id: UUID,
-    api_type: APIDocType
-):
-    db_type = API_TO_DB[api_type]
-    # 1) 找到 documents 记录
-    doc = (
-        db.query(Document)
-          .filter(
-             Document.user_id == user_id,
-             Document.type    == db_type   # 用映射后的值
-          )
-          .first()
-    )
-    if not doc or not doc.current_version_id:
-        return None
 
-    # 2) 拿当前版本
-    ver = (
-        db.query(DocumentVersion)
-          .filter(DocumentVersion.id == doc.current_version_id)
-          .first()
+def save_document_by_id(
+        db: Session,
+        doc_id: uuid.UUID,
+        payload: schemas.DocumentSave
+) -> tuple[document_models.Document, document_models.DocumentVersion]:
+    """
+    根据文档ID保存一个新的文档版本。
+    在数据库的documents表里找到对应的id并查找和更新行的相关信息，
+    最后把上传的内容存到document_versions表里。
+    """
+    # 1. 查找指定的文档
+    doc = (
+        db.query(document_models.Document)
+        .filter_by(id=doc_id)
+        .first()
     )
-    if not ver:
-        return None
+
+    if not doc:
+        raise ValueError(f"文档ID {doc_id} 不存在")
+
+    # 检查文档是否已被软删除
+    if doc.deleted_at is not None:
+        raise ValueError(f"文档ID {doc_id} 已被删除")
+
+    # 验证用户权限（可选：确保用户只能修改自己的文档）
+    if doc.user_id != payload.user_id:
+        raise ValueError("用户无权修改此文档")
+
+    # 2. 计算下一个版本号（排除已删除的版本）
+    count = (
+        db.query(document_models.DocumentVersion)
+        .filter(
+            document_models.DocumentVersion.document_id == doc.id,
+            document_models.DocumentVersion.deleted_at.is_(None)
+        )
+        .count()
+    )
+    next_ver = count + 1
+
+    # 3. 创建并插入新版本
+    ver = document_models.DocumentVersion(
+        document_id=doc.id,
+        version_number=next_ver,
+        content=payload.content_md,
+        created_by=payload.user_id
+    )
+    db.add(ver)
+    db.flush()  # 刷新以获取 ver.id
+
+    # 4. 更新文档的 current_version_id 和 updated_at
+    doc.current_version_id = ver.id
+    db.add(doc)
+
+    # 5. 提交事务
+    db.commit()
+    db.refresh(doc)
+    db.refresh(ver)
 
     return doc, ver
+
+
+def get_document_history_by_id(
+        db: Session,
+        doc_id: uuid.UUID,
+        user_id: uuid.UUID
+) -> list[document_models.DocumentVersion]:
+    """
+    根据文档ID获取文档的历史版本列表。
+    在数据库的documents表里找到对应的id并查找document_versions表里的外键documents_id为id的数据。
+    只返回未被软删除的版本。
+    """
+    # 1. 查找指定的文档
+    doc = (
+        db.query(document_models.Document)
+        .filter_by(id=doc_id)
+        .first()
+    )
+
+    if not doc:
+        raise ValueError(f"文档ID {doc_id} 不存在")
+
+    # 检查文档是否已被软删除
+    if doc.deleted_at is not None:
+        raise ValueError(f"文档ID {doc_id} 已被删除")
+
+    # 验证用户权限（确保用户只能查看自己的文档）
+    if doc.user_id != user_id:
+        raise ValueError("用户无权查看此文档")
+
+    # 2. 查找document_versions表里的外键documents_id为id的数据，排除已删除的版本
+    versions = (
+        db.query(document_models.DocumentVersion)
+        .filter(
+            document_models.DocumentVersion.document_id == doc_id,
+            document_models.DocumentVersion.deleted_at.is_(None)
+        )
+        .order_by(document_models.DocumentVersion.version_number.desc())
+        .all()
+    )
+
+    return versions
+
+
+def create_document(
+        db: Session,
+        user_id: uuid.UUID,
+        doc_type: str
+) -> document_models.Document:
+    """
+    创建新的文档记录。
+    向documents表插入一行数据，title和current_version_id都设为空。
+    """
+    # 验证文档类型
+    valid_types = ["resume", "personal_statement", "recommendation"]
+    if doc_type not in valid_types:
+        raise ValueError(f"无效的文档类型: {doc_type}。有效类型: {valid_types}")
+    
+    # 创建新的文档记录
+    doc = document_models.Document(
+        user_id=user_id,
+        type=doc_type,
+        title="",  # 设为空
+        current_version_id=None  # 设为空
+    )
+    
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    
+    return doc
+
+
+def get_user_documents_by_type(
+        db: Session,
+        user_id: uuid.UUID,
+        doc_type: str
+) -> list[document_models.Document]:
+    """
+    查询documents表中user_id为指定用户ID且type为指定类型的文档。
+    返回这些行的相关信息。只返回未被软删除的文档。
+    """
+    # 验证文档类型
+    valid_types = ["resume", "personal_statement", "recommendation"]
+    if doc_type not in valid_types:
+        raise ValueError(f"无效的文档类型: {doc_type}。有效类型: {valid_types}")
+    
+    # 查询documents表中user_id为指定用户ID且type为指定类型的文档，排除已删除的文档
+    documents = (
+        db.query(document_models.Document)
+        .filter(
+            document_models.Document.user_id == user_id,
+            document_models.Document.type == doc_type,
+            document_models.Document.deleted_at.is_(None)
+        )
+        .order_by(document_models.Document.created_at.desc())
+        .all()
+    )
+    
+    return documents

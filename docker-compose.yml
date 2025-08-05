@@ -1,0 +1,94 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: aiagent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 13689282250
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/config/sql_postgre:/docker-entrypoint-initdb.d
+    networks:
+      - cv-agent-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:13689282250@postgres:5432/aiagent
+      SECRET_KEY: cv-agent-secret-key-change-in-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      API_KEY: 9589ca16aa2844de6975809fbac3891ef2a105eadcde6f56e044c60b6b774ec4
+      DIFY_API_URL: http://dify:8681/v1/chat-messages
+      DIFY_API_KEY_PARSE: app-BsUrtqDA5l71cxenG2sNmAFs
+      DIFY_API_KEY_REWRITE: app-DjEoeij5ccxJuJA2MTpoktpV
+      DIFY_API_KEY_EXPAND: app-sqHPblORpyUR5ZVxeLBCc9hJ
+      DIFY_API_KEY_CONTRACT: app-cIQNpQSAktdBQ8vXdLtA2A1R
+      DIFY_API_KEY_PROCESS_TEXT: app-e7MMB0mBSXPWc9JRYKtkTXOM
+      DIFY_API_KEY_PERSONAL_STATEMENT: app-TFykFDGvmxbFLoUdwIElvtQ9
+      DIFY_API_KEY_RECOMMENDATION: app-4fBLyvAlToPPFLtZbbFPv9uO
+      DIFY_API_KEY_PROMPT_BASED: app-CgUDCXR8PJvFPnNVWUPAG7g3
+      DIFY_API_KEY_NAMING: app-FdmH8RmrVmIcrRQjG9BZHSew
+      ORIGINS: http://localhost:80,http://127.0.0.1:80
+      LOG_LEVEL: INFO
+      POSTGRES_PASSWORD: 13689282250
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/main.py:/app/main.py
+      - ./backend/requirements.txt:/app/requirements.txt
+      - ./backend/env.example:/app/.env
+      - ./backend/wait-for-db.sh:/app/wait-for-db.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cv-agent-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8699/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    networks:
+      - cv-agent-network
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: ./Nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - cv-agent-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  cv-agent-network:
+    driver: bridge

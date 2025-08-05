@@ -1,9 +1,9 @@
 from sqlalchemy import Column, String, DateTime, Integer, Text, ForeignKey, CheckConstraint
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
-import uuid
 
 class DocType(enum.Enum):
     resume = "resume"
@@ -18,12 +18,12 @@ class ContentFormat(enum.Enum):
 class Document(Base):
     __tablename__ = "documents"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    type = Column(String, nullable=False, default=DocType.resume.value)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    type = Column(ENUM(DocType), nullable=False, default=DocType.resume)
     title = Column(String, nullable=False, default="")
-    current_version_id = Column(String, ForeignKey("document_versions.id", ondelete="SET NULL"), nullable=True)
-    doc_metadata = Column(String, nullable=False, default="{}")  # JSON as string for SQLite
+    current_version_id = Column(UUID(as_uuid=True), ForeignKey("document_versions.id", ondelete="SET NULL"), nullable=True)
+    doc_metadata = Column("metadata", JSONB, nullable=False, default=dict)  # 使用name参数映射到metadata列
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime, nullable=True)
@@ -36,22 +36,22 @@ class Document(Base):
 class DocumentVersion(Base):
     __tablename__ = "document_versions"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    document_id = Column(String, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     version_number = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
-    content_format = Column(String, nullable=False, default=ContentFormat.markdown.value)
-    diff_from = Column(String, ForeignKey("document_versions.id"), nullable=True)
+    content_format = Column(ENUM(ContentFormat), nullable=False, default=ContentFormat.markdown)
+    diff_from = Column(UUID(as_uuid=True), ForeignKey("document_versions.id"), nullable=True)
     checksum_sha256 = Column(String, nullable=True)
-    created_by = Column(String, ForeignKey("users.id"), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime, nullable=True)
-    version_metadata = Column(String, nullable=False, default="{}")  # JSON as string for SQLite
+    version_metadata = Column("metadata", JSONB, nullable=False, default=dict)  # 使用name参数映射到metadata列
     
     # 添加约束检查
     __table_args__ = (
-        CheckConstraint("length(content) <= 50000", name="chk_content_len"),
+        CheckConstraint("char_length(content) <= 5000", name="chk_content_len"),
     )
     
     # 关系

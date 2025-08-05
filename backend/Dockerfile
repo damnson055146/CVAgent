@@ -4,6 +4,10 @@ FROM python:3.11-slim
 # 设置工作目录
 WORKDIR /app
 
+# 设置环境变量
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
 # 安装系统依赖
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -12,15 +16,13 @@ RUN apt-get update \
          gcc \
          postgresql-client \
          curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# 配置pip镜像源（中国）
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ \
-    && pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # 拷贝并安装 Python 依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 # 拷贝应用代码
 COPY main.py .
@@ -31,8 +33,14 @@ COPY env.example .env
 COPY wait-for-db.sh .
 RUN chmod +x wait-for-db.sh
 
+# 创建非root用户
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+
 # 暴露容器内端口
-EXPOSE 8000
+EXPOSE 8699
+
+# 切换到非root用户
+USER appuser
 
 # 启动命令
-CMD ["./wait-for-db.sh", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["./wait-for-db.sh", "postgres", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8699"]

@@ -105,6 +105,10 @@ class DifyClient:
         except Exception as e:
             return f"调用Dify prompt-based接口失败: {e}"
 
+    def name_document(self, text: str) -> str:
+        """调用Dify为传入的Markdown文本生成一个标题。"""
+        return self._call_text_modification_api('naming', text, 'naming-user')
+
 
 # 创建一个全局的Dify客户端实例
 dify_client = DifyClient(settings.DIFY_API_URL, settings.DIFY_API_KEYS)

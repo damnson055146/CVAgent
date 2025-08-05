@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Button from '../comcomponents/common/Button.jsx';
+import Button from '../Comcomponents/common/Button.jsx';
 
 const SelectionToolbar = ({
   position,
