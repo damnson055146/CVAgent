@@ -120,11 +120,11 @@ const WORD_STYLE_CONFIG = {
       spacing: { after: 480, before: 240 }, // 匹配预览区样式
     },
     h2: {
-      fontSize: 30, // 1.5rem * 20
-      color: '00000',
+      fontSize: 32, // 1.5rem * 20
+      color: '000000', 
       bold: true,
-      spacing: { after: 400, before: 300 }, // 匹配预览区样式
-      border: { bottom: { style: 'single', size: 2, color: '494949' } },
+      spacing: { after: 20, before: 200 }, // 减少间距，原来是 after: 600, before: 300
+      border: { bottom: { style: 'single', size: 6, color: '494949' } }, // 增加分隔线大小以更明显显示
     },
     h3: {
       fontSize: 24, // 1.15rem * 20
@@ -179,11 +179,11 @@ const PDF_STYLE_CONFIG = {
       spacing: { after: 8, before: 4 }, // 减少间距
     },
     h2: {
-      fontSize: 16, // 1.5rem 转换为PDF尺寸
+      fontSize: 15, // 1.5rem 转换为PDF尺寸
       color: [0, 0, 0], //rgb(0, 0, 0) 深蓝色
       bold: true,
-      spacing: { after: 6, before: 5 }, // 减少间距
-      border: { bottom: { style: 'solid', width: 0.1, color: [73, 73, 73] } }, // width in mm
+      spacing: { after: 5, before: 2 }, // 增加下边距，匹配预览区的padding-bottom效果
+      border: { bottom: { style: 'solid', width: 0.3, color: [73, 73, 73] } }, // 增加宽度，更接近预览区的1px效果
     },
     h3: {
       fontSize: 14, // 1.15rem 转换为PDF尺寸
@@ -498,7 +498,6 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
     }
     
     try {
-      // 修复：为center类型的块添加专门的日志
       if (block.type === 'center') {
         console.log(`处理center块 ${index}:`, {
           type: block.type,
@@ -511,16 +510,11 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
         content.forEach((line, lineIndex) => {
           if (line && typeof line === 'string' && line.trim()) {
             console.log(`处理center块第${lineIndex}行:`, line);
-            
-            // 检查是否是标题
             const headingMatch = line.match(/^(#+)\s*(.+)$/);
             if (headingMatch) {
               const level = headingMatch[1].length;
               const headingText = headingMatch[2];
-              
-              // 根据标题级别设置样式
               let headingStyle;
-              
               if (level === 1) {
                 headingStyle = styleConfig.h1;
               } else if (level === 2) {
@@ -528,15 +522,25 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
               } else {
                 headingStyle = styleConfig.h3;
               }
-              
+
+              // MODIFIED START: 直接在H2段落上应用边框
               const paragraphOptions = {
                 alignment: AlignmentType.CENTER,
                 spacing: headingStyle.spacing,
               };
-              
-              // 如果是二级标题，添加边框下划线
+
+              // 如果是H2并且有边框样式，直接添加到段落属性中
               if (level === 2 && headingStyle.border) {
-                paragraphOptions.border = headingStyle.border;
+                paragraphOptions.border = {
+                  bottom: {
+                    color: headingStyle.border.bottom.color,
+                    space: 1, // 边框和文本的距离
+                    value: 'single',
+                    size: headingStyle.border.bottom.size,
+                  }
+                };
+                // 为了模拟padding-bottom的效果，可以适当增加spacing.after
+                paragraphOptions.spacing.after = (paragraphOptions.spacing.after || 0) + 120; // 增加6pt的间距
               }
               
               children.push(new Paragraph({
@@ -551,11 +555,9 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
                   })
                 ]
               }));
-              
+              // MODIFIED END: 移除了原来用于添加分割线的独立Paragraph
             } else {
-              // 普通居中文本，支持内联格式
               const textRuns = parseInlineFormatting(line, styleConfig);
-              
               children.push(new Paragraph({
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 200 },
@@ -566,10 +568,8 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
         });
         
       } else if (block.type === 'row') {
-        // 左右对齐的行 - 使用表格实现更精确的对齐
         console.log(`处理row块 ${index}:`, block.left, '|', block.right);
         
-        // 左右对齐的行，支持内联格式
         const leftText = block.left || '';
         const rightText = block.right || '';
         
@@ -613,7 +613,6 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
         }
         
       } else {
-        // 普通文本块
         const text = block.content || '';
         if (typeof text === 'string' && text.trim()) {
           const parsedContent = parseMarkdownToWordElements(text, styleConfig);
@@ -639,7 +638,6 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
     }
   }
   
-  // 如果不是最后一页且不是第一页，添加分页符
   if (!isLastPage && !isFirstPage) {
     children.push(new Paragraph({
       pageBreakBefore: true,
@@ -660,8 +658,6 @@ const cleanMarkdownText = (text) => {
   
   return text
     .replace(/^#+\s*/, '') // 移除标题标记
-    // .replace(/\*\*(.*?)\*\*/g, '$1') // 不再移除，交由专门函数处理
-    // .replace(/\*(.*?)\*/g, '$1')   // 不再移除
     .replace(/`(.*?)`/g, '$1') // 移除代码标记但保留内容
     .replace(/^\s*[-*+]\s*/, '') // 移除列表标记
     .trim();
@@ -676,14 +672,12 @@ const parseMarkdownToWordElements = (text, styleConfig) => {
   }
   
   try {
-    // 检测标题
     const headingMatch = text.match(/^(#+)\s*(.+)$/);
     if (headingMatch) {
       const level = headingMatch[1].length;
       const headingText = headingMatch[2];
       
       let headingStyle;
-      
       if (level === 1) {
         headingStyle = styleConfig.h1;
       } else if (level === 2) {
@@ -700,25 +694,34 @@ const parseMarkdownToWordElements = (text, styleConfig) => {
         color: headingStyle.color
       };
       
+      // MODIFIED START: 直接在H2段落上应用边框
       const paragraphOptions = {
         spacing: headingStyle.spacing
       };
-      
-      // 如果是二级标题，添加边框下划线
+
       if (level === 2 && headingStyle.border) {
-        paragraphOptions.border = headingStyle.border;
+        paragraphOptions.border = {
+          bottom: {
+            color: headingStyle.border.bottom.color,
+            space: 1,
+            value: 'single',
+            size: headingStyle.border.bottom.size
+          }
+        };
+        // 模拟padding-bottom，增加段后间距
+        paragraphOptions.spacing.after = (paragraphOptions.spacing.after || 0) + 120; // 增加6pt
       }
       
       elements.push(new Paragraph({
         ...paragraphOptions,
         children: [new TextRun(textRunOptions)]
       }));
+      // MODIFIED END: 移除了原来用于添加分割线的独立Paragraph
       
       console.log(`处理${level}级标题: ${headingText}, 样式:`, textRunOptions);
       return elements;
     }
     
-    // 检测分割线
     if (text.trim() === '---' || text.trim() === '***') {
       elements.push(new Paragraph({
         spacing: styleConfig.hr.spacing,
@@ -734,12 +737,9 @@ const parseMarkdownToWordElements = (text, styleConfig) => {
       return elements;
     }
     
-    // 检测列表项
     const listMatch = text.match(/^\s*[-*+]\s*(.+)$/);
     if (listMatch) {
       const listText = listMatch[1];
-      
-      // 处理列表项中的内联格式
       const listTextRuns = parseInlineFormatting(listText, styleConfig);
       
       elements.push(new Paragraph({
@@ -753,7 +753,6 @@ const parseMarkdownToWordElements = (text, styleConfig) => {
       return elements;
     }
     
-    // 处理普通段落文本，支持内联格式
     const textRuns = parseInlineFormatting(text, styleConfig);
     
     elements.push(new Paragraph({
@@ -763,7 +762,6 @@ const parseMarkdownToWordElements = (text, styleConfig) => {
     
   } catch (error) {
     console.error('解析Markdown文本时出错:', error);
-    // 返回纯文本段落作为后备
     elements.push(new Paragraph({
       spacing: styleConfig.paragraph.spacing,
       children: [
@@ -793,24 +791,20 @@ const generateSimplePdf = async (content, config, resumeData) => {
     format: 'a4',
   });
 
-  // 使用默认字体
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(12);
 
   const pageMargin = 20;
   let yPos = pageMargin;
 
-  // 添加标题
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.text('简历', pageMargin, yPos);
   yPos += 20;
 
-  // 添加内容
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
   
-  // 清理内容并分割成行
   const cleanContent = content.replace(/[#*_`]/g, '').trim();
   const lines = cleanContent.split('\n').filter(line => line.trim());
   
@@ -821,18 +815,16 @@ const generateSimplePdf = async (content, config, resumeData) => {
     }
     
     try {
-      // 安全地渲染文本
       doc.text(line, pageMargin, yPos);
     } catch (textError) {
       console.warn('文本渲染失败，使用ASCII字符:', textError);
-      // 如果渲染失败，只保留ASCII字符
       const safeText = line.replace(/[^\x00-\x7F]/g, '');
       if (safeText.trim()) {
         doc.text(safeText, pageMargin, yPos);
       }
     }
     
-    yPos += 8; // 固定行高
+    yPos += 8;
   }
 
   const fileName = `${resumeData?.user_name || 'resume'}_简历_简单版.pdf`;
@@ -855,10 +847,8 @@ const parseInlineFormatting = (text, styleConfig) => {
   try {
     console.log('解析文本格式:', text);
     
-    // 创建一个处理队列，按优先级处理不同的格式
     const formatHandlers = [
       {
-        // 处理粗体文本 **text**
         regex: /\*\*(.*?)\*\*/g,
         name: 'bold',
         handler: (match, content) => ({
@@ -870,7 +860,6 @@ const parseInlineFormatting = (text, styleConfig) => {
         })
       },
       {
-        // 处理斜体文本 *text* (单个星号)
         regex: /(?<!\*)\*([^*]+?)\*(?!\*)/g,
         name: 'italic',
         handler: (match, content) => ({
@@ -881,23 +870,20 @@ const parseInlineFormatting = (text, styleConfig) => {
         })
       },
       {
-        // 处理代码文本 `text`
         regex: /`([^`]+?)`/g,
         name: 'code',
         handler: (match, content) => ({
           text: content,
           size: styleConfig.paragraph.fontSize,
-          font: 'Courier New', // 使用等宽字体，匹配预览区的代码样式
+          font: 'Courier New',
           color: '666666',
-          highlight: 'F5F5F5' // 浅灰色背景
+          highlight: 'F5F5F5'
         })
       }
     ];
     
-    // 使用递归方法处理嵌套格式
     const processTextWithFormats = (inputText, handlerIndex = 0) => {
       if (handlerIndex >= formatHandlers.length) {
-        // 所有格式都处理完了，返回纯文本
         if (inputText.trim()) {
           return [new TextRun({
             text: inputText,
@@ -916,13 +902,11 @@ const parseInlineFormatting = (text, styleConfig) => {
       let match;
       
       while ((match = regex.exec(inputText)) !== null) {
-        // 处理格式前的普通文本
         if (match.index > lastIndex) {
           const beforeText = inputText.substring(lastIndex, match.index);
           results.push(...processTextWithFormats(beforeText, handlerIndex + 1));
         }
         
-        // 处理格式化文本
         const formattedTextRun = new TextRun(handler.handler(match, match[1]));
         results.push(formattedTextRun);
         
@@ -931,7 +915,6 @@ const parseInlineFormatting = (text, styleConfig) => {
         lastIndex = match.index + match[0].length;
       }
       
-      // 处理剩余的普通文本
       if (lastIndex < inputText.length) {
         const remainingText = inputText.substring(lastIndex);
         results.push(...processTextWithFormats(remainingText, handlerIndex + 1));
@@ -949,7 +932,6 @@ const parseInlineFormatting = (text, styleConfig) => {
     
   } catch (error) {
     console.error('解析行内格式时出错:', error);
-    // 返回纯文本作为后备
     textRuns.push(new TextRun({
       text: cleanMarkdownText(text),
       size: styleConfig.paragraph.fontSize,
@@ -971,7 +953,6 @@ const generateWordContent = (blocks, config) => {
 
 // 修复 CustomMarkdownPage 组件，添加更好的错误处理
 function CustomMarkdownPage({ blocks }) {
-  // 添加调试信息
   console.log('CustomMarkdownPage 渲染，接收到的块数:', blocks?.length || 0);
   
   if (!blocks || !Array.isArray(blocks) || blocks.length === 0) {
@@ -1054,11 +1035,9 @@ function CustomMarkdownPage({ blocks }) {
 function renderStyledLine(doc, text, x, y, style, strongStyle) {
   const FONT_NAME = style.baseFont || 'helvetica';
   const FONT_SIZE = style.fontSize;
-  // 确保颜色值是数组格式，防止"is not iterable"错误
   const NORMAL_COLOR = Array.isArray(style.color) ? style.color : [0,0,0];
   const STRONG_COLOR = Array.isArray(strongStyle.color) ? strongStyle.color : [34, 34, 59];
 
-  // 将文本按**粗体**标记分割
   const parts = text.split(/(\*\*.*?\*\*)/g).filter(p => p);
   let currentX = x;
 
@@ -1066,7 +1045,6 @@ function renderStyledLine(doc, text, x, y, style, strongStyle) {
     const isBold = part.startsWith('**') && part.endsWith('**');
     const partText = isBold ? part.slice(2, -2) : part;
 
-    // 设置字体和颜色
     doc.setFont(FONT_NAME, isBold ? 'bold' : 'normal');
     doc.setTextColor(...(isBold ? STRONG_COLOR : NORMAL_COLOR));
 
@@ -1088,11 +1066,9 @@ function renderStyledLine(doc, text, x, y, style, strongStyle) {
 function renderStyledLineCentered(doc, text, x, y, style, strongStyle) {
   const FONT_NAME = style.baseFont || 'helvetica';
   const FONT_SIZE = style.fontSize;
-  // 确保颜色值是数组格式，防止"is not iterable"错误
   const NORMAL_COLOR = Array.isArray(style.color) ? style.color : [0,0,0];
   const STRONG_COLOR = Array.isArray(strongStyle.color) ? strongStyle.color : [34, 34, 59];
 
-  // 将文本按**粗体**标记分割
   const parts = text.split(/(\*\*.*?\*\*)/g).filter(p => p);
   let currentX = x;
 
@@ -1100,7 +1076,6 @@ function renderStyledLineCentered(doc, text, x, y, style, strongStyle) {
     const isBold = part.startsWith('**') && part.endsWith('**');
     const partText = isBold ? part.slice(2, -2) : part;
 
-    // 设置字体和颜色
     doc.setFont(FONT_NAME, isBold ? 'bold' : 'normal');
     doc.setTextColor(...(isBold ? STRONG_COLOR : NORMAL_COLOR));
 
@@ -1124,24 +1099,18 @@ const generatePdfStyleConfig = (config) => {
   const baseFontSize = config.fontSize || 12;
   const baseLineHeight = config.lineHeight || 1.5;
   
-  // 计算字体大小比例（与Word生成保持一致）
-  // Word中：h1=44pt, h2=30pt, h3=24pt, paragraph=24pt
-  // 转换为比例：h1=1.833, h2=1.25, h3=1.0
   const h1Ratio = 1.833; // 44/24
   const h2Ratio = 1.25;  // 30/24
   const h3Ratio = 1.0;   // 24/24
   
-  // 动态计算间距（参考Word样式配置的间距比例，但更紧凑）
-  const spacingRatio = (baseFontSize / 12) * 0.7; // 基于12pt的间距比例，但减少30%
+  const spacingRatio = (baseFontSize / 12) * 0.7;
   
   return {
     ...baseStyleConfig,
-    // 使用传入的配置覆盖默认值
     baseFont: config.font || baseStyleConfig.baseFont,
     baseFontSize: baseFontSize,
     lineHeight: baseLineHeight,
     
-    // 根据传入的字体大小动态调整其他样式
     h1: {
       ...baseStyleConfig.h1,
       fontSize: Math.round(baseFontSize * h1Ratio),
@@ -1207,23 +1176,18 @@ const generateTextualPdf = async (content, config, resumeData) => {
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   
-  // 使用动态生成的PDF样式配置
   const styleConfig = generatePdfStyleConfig(config);
   console.log('PDF样式配置:', styleConfig);
   
-  // 设置字体支持，优先使用传入的字体，如果没有则使用默认字体
   let FONT_NAME = styleConfig.baseFont;
   
-  // 检查是否需要中文字体支持
   const hasChineseChars = /[\u4e00-\u9fff]/.test(content);
   if (hasChineseChars) {
-    // 如果有中文字符，尝试使用支持中文的字体
     if (config.font && config.font.toLowerCase().includes('simsun')) {
       FONT_NAME = 'SimSun';
     } else if (config.font && config.font.toLowerCase().includes('microsoft')) {
       FONT_NAME = 'Microsoft YaHei';
     } else {
-      // 默认使用helvetica，但添加中文字体支持
       FONT_NAME = 'helvetica';
       console.log('检测到中文字符，使用helvetica字体（可能需要额外配置）');
     }
@@ -1254,31 +1218,20 @@ const generateTextualPdf = async (content, config, resumeData) => {
     yPos = checkPageBreak(yPos);
 
     try {
-      // 居中块 - 参考Word生成逻辑
       if (block.type === 'center') {
-        console.log('处理center块:', block);
         const content = Array.isArray(block.content) ? block.content : [block.content];
         
         content.forEach((line, lineIndex) => {
           if (line && typeof line === 'string' && line.trim()) {
-            console.log(`处理center块第${lineIndex}行:`, line);
-            
-            // 检查是否是标题
             const headingMatch = line.match(/^(#+)\s*(.+)$/);
             if (headingMatch) {
               const level = headingMatch[1].length;
               const headingText = headingMatch[2];
               
-              // 根据标题级别设置样式
               let headingStyle;
-              
-              if (level === 1) {
-                headingStyle = styleConfig.h1;
-              } else if (level === 2) {
-                headingStyle = styleConfig.h2;
-              } else {
-                headingStyle = styleConfig.h3;
-              }
+              if (level === 1) headingStyle = styleConfig.h1;
+              else if (level === 2) headingStyle = styleConfig.h2;
+              else headingStyle = styleConfig.h3;
               
               yPos += (headingStyle.spacing.before || 0);
               yPos = checkPageBreak(yPos);
@@ -1293,20 +1246,23 @@ const generateTextualPdf = async (content, config, resumeData) => {
               const textHeight = textLines.length * ptToMm(headingStyle.fontSize) * (headingStyle.lineHeight || 1.2);
               yPos += textHeight;
               
-              // 如果是二级标题，添加边框下划线
+              // MODIFIED START: 修正居中H2下划线逻辑
               if (level === 2 && headingStyle.border) {
-                const textWidth = doc.getTextWidth(headingText);
-                const lineY = yPos - textHeight + ptToMm(headingStyle.fontSize) + 1;
-                const lineX = (A4_WIDTH_MM - textWidth) / 2;
-                doc.setDrawColor(...headingStyle.border.bottom.color);
-                doc.setLineWidth(headingStyle.border.bottom.width);
-                doc.line(lineX, lineY, lineX + textWidth, lineY);
+                  const paddingBottomMm = ptToMm(styleConfig.baseFontSize) * 0.4;
+                  const underlineY = yPos + paddingBottomMm;
+
+                  yPos = checkPageBreak(underlineY, headingStyle.border.bottom.width);
+
+                  doc.setDrawColor(...headingStyle.border.bottom.color);
+                  doc.setLineWidth(headingStyle.border.bottom.width);
+                  doc.line(PAGE_MARGIN, underlineY, A4_WIDTH_MM - PAGE_MARGIN, underlineY);
+                  yPos = underlineY + 0.5; 
               }
+              // MODIFIED END
               
               yPos += headingStyle.spacing.after;
               
             } else {
-              // 普通居中文本，支持内联格式
               const style = styleConfig.paragraph;
               yPos += (style.spacing.before || 0);
               yPos = checkPageBreak(yPos);
@@ -1314,14 +1270,10 @@ const generateTextualPdf = async (content, config, resumeData) => {
               doc.setFont(FONT_NAME, 'normal');
               doc.setFontSize(style.fontSize);
               
-              // 处理居中文本，支持内联格式
               const textLines = doc.splitTextToSize(line, CONTENT_WIDTH);
               for (const textLine of textLines) {
-                // 计算居中位置
                 const textWidth = doc.getTextWidth(textLine);
                 const centerX = (A4_WIDTH_MM - textWidth) / 2;
-                
-                // 渲染带格式的文本
                 renderStyledLineCentered(doc, textLine, centerX, yPos, style, styleConfig.strong);
                 yPos += ptToMm(style.fontSize) * style.lineHeight;
               }
@@ -1331,10 +1283,7 @@ const generateTextualPdf = async (content, config, resumeData) => {
           }
         });
       } 
-      // 左右对齐 - 参考Word生成逻辑
       else if (block.type === 'row') {
-          console.log('处理row块:', block.left, '|', block.right);
-          
           const style = styleConfig.paragraph;
           yPos += (style.spacing.before || 0);
           yPos = checkPageBreak(yPos);
@@ -1346,14 +1295,12 @@ const generateTextualPdf = async (content, config, resumeData) => {
             doc.setFont(FONT_NAME, 'normal');
             doc.setFontSize(style.fontSize);
             
-            // 渲染左侧文本，支持内联格式
             if (leftText) {
               renderStyledLine(doc, leftText, PAGE_MARGIN, yPos, style, styleConfig.strong);
             }
             
-            // 渲染右侧文本，支持内联格式
             if (rightText) {
-              const rightCleanText = rightText.replace(/\*\*/g, ''); // 估算宽度用
+              const rightCleanText = rightText.replace(/\*\*/g, '');
               const rightWidth = doc.getTextWidth(rightCleanText);
               const rightX = A4_WIDTH_MM - PAGE_MARGIN - rightWidth;
               renderStyledLine(doc, rightText, rightX, yPos, style, styleConfig.strong);
@@ -1364,7 +1311,6 @@ const generateTextualPdf = async (content, config, resumeData) => {
           
           yPos += style.spacing.after;
       }
-      // 左对齐或右对齐 - 参考Word生成逻辑
       else if (block.type === 'left' || block.type === 'right') {
           const style = styleConfig.paragraph;
           yPos += (style.spacing.before || 0);
@@ -1387,14 +1333,12 @@ const generateTextualPdf = async (content, config, resumeData) => {
           }
           yPos += style.spacing.after;
       }
-      // 普通块 - 参考Word生成逻辑
       else if (block.type === 'normal' && block.content && block.content.trim()) {
         const text = block.content.trim();
         const headingMatch = text.match(/^(#+)\s*(.+)$/);
         const listMatch = text.match(/^\s*[-*+]\s+(.+)$/);
         const hrMatch = text === '---' || text === '***';
 
-        // 分割线
         if (hrMatch) {
             const style = styleConfig.hr;
             yPos += style.spacing.before;
@@ -1404,7 +1348,6 @@ const generateTextualPdf = async (content, config, resumeData) => {
             doc.line(PAGE_MARGIN, yPos, A4_WIDTH_MM - PAGE_MARGIN, yPos);
             yPos += style.spacing.after;
         }
-        // 标题
         else if (headingMatch) {
             const level = headingMatch[1].length;
             const style = level === 1 ? styleConfig.h1 : level === 2 ? styleConfig.h2 : styleConfig.h3;
@@ -1425,17 +1368,22 @@ const generateTextualPdf = async (content, config, resumeData) => {
             doc.text(textLines, PAGE_MARGIN, yPos);
             yPos += textHeight;
             
-            // H2下划线
+            // MODIFIED START: 修正H2下划线逻辑
             if (level === 2 && style.border) {
-                const underlineY = yPos + 1; // 紧随文本下方
+                const paddingBottomMm = ptToMm(styleConfig.baseFontSize) * 0.4;
+                const underlineY = yPos + paddingBottomMm;
+
+                yPos = checkPageBreak(underlineY, style.border.bottom.width);
+
                 doc.setDrawColor(...style.border.bottom.color);
                 doc.setLineWidth(style.border.bottom.width);
                 doc.line(PAGE_MARGIN, underlineY, A4_WIDTH_MM - PAGE_MARGIN, underlineY);
-                yPos += 2; // 为下划线留出空间
+                yPos = underlineY + 0.5;
             }
+            // MODIFIED END
+
             yPos += style.spacing.after;
         }
-        // 列表
         else if (listMatch) {
             const style = styleConfig.list;
             yPos += (style.spacing.before || 0);
@@ -1457,7 +1405,6 @@ const generateTextualPdf = async (content, config, resumeData) => {
             }
             yPos += style.spacing.after;
         }
-        // 段落
         else {
             const style = styleConfig.paragraph;
             yPos += (style.spacing.before || 0);
@@ -1519,7 +1466,6 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
     }
   }, [content, config]);
   
-  // MODIFIED: PDF generation logic is now text-based
   const generatePDF = useCallback(async () => {
     setLoading(true);
     try {
@@ -1554,7 +1500,6 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
 
     setLoading(true);
     try {
-      // 确保使用与预览区相同的配置
       const wordConfig = {
         ...config,
         font: config.font || 'SimSun',
@@ -1637,7 +1582,6 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
         )}
       </div>
       
-      {/* 样式部分保持不变 */}
       <style>{`
        @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(20px); }
@@ -1645,7 +1589,6 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
         }
         .animate-fadeInUp { animation: fadeInUp 0.18s cubic-bezier(.4,0,.2,1); }
       `}</style>
-      {/* 样式1黑色 */}
       <style>{`
         .resume-theme-style1 .resume-markdown,
         .resume-theme-style2 .resume-markdown {
@@ -1655,7 +1598,6 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
         .resume-theme-style2 .resume-markdown * {
           color: inherit !important;
         }
-        /* 覆盖prose的暗色样式 */
         .resume-theme-style1 .resume-markdown.dark\:prose-invert,
         .resume-theme-style2 .resume-markdown.dark\:prose-invert {
           color: #000 !important;
@@ -1665,7 +1607,6 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
           color: inherit !important;
         }
         
-        /* 通用标题样式 - 支持动态字体大小 */
         .resume-markdown h1 {
           font-size: calc(1.833 * var(--base-font-size, 12pt));
           font-weight: bold;
@@ -1682,6 +1623,7 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
           font-weight: 600;
           border-bottom: 1px solid rgb(73, 73, 73);
           padding-left: 0.6rem;
+          padding-bottom: 0.5rem;
         }
         .resume-markdown h3 {
           font-size: calc(0.958 * var(--base-font-size, 12pt));
@@ -1691,7 +1633,6 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
           font-weight: 500;
         }
        
-
         .resume-theme-style1 .resume-markdown strong {
           color: #22223b;
           font-weight: bold;
@@ -1712,11 +1653,9 @@ const RenderPreview = forwardRef(({ content, config = DEFAULT_CONFIG, resumeData
           margin: 1.5rem 0;
         }
         .resume-theme-style1 .resume-page {
-          // box-shadow: 0 4px 24px 0 #2563eb22;
           border-radius: 12px;
           overflow: hidden;
         }
-
       `}</style>
     </div>
   );
