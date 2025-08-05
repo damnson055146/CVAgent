@@ -106,3 +106,35 @@ textarea.dark\:bg-gray-900 {
 .dark textarea {
   color: white !important;
 }
+
+/* 拖拽相关样式 */
+.selection-toolbar {
+  /* 移除过渡效果以提高拖拽响应性 */
+}
+
+.selection-toolbar:hover {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* 拖拽时的样式 */
+.selection-toolbar.dragging {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* 拖拽指示器样式 */
+.drag-indicator {
+  cursor: grab;
+}
+
+.drag-indicator:active {
+  cursor: grabbing;
+}
+
+/* 防止拖拽时选中文字 */
+.selection-toolbar * {
+  user-select: none;
+}
+
+.selection-toolbar textarea {
+  user-select: text;
+}

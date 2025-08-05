@@ -28,6 +28,34 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
   const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains('dark'));
   const selectionTimeoutRef = useRef(null);
 
+  // 新增：处理工具栏位置变化
+  const handleToolbarPositionChange = useCallback((newPosition) => {
+    if (!containerRef.current) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const toolbarWidth = aiPreview ? 500 : showPromptInput ? 400 : 280;
+    const toolbarHeight = aiPreview ? 120 : showPromptInput ? 180 : 48;
+    
+    // 边界约束
+    let x = newPosition.x;
+    let y = newPosition.y;
+    
+    // 水平边界约束 - 确保工具栏完全在容器内
+    const minX = containerRect.left + 5;
+    const maxX = containerRect.right - toolbarWidth - 5;
+    x = Math.max(minX, Math.min(x, maxX));
+    
+    // 垂直边界约束 - 确保工具栏完全在容器内
+    const minY = containerRect.top + 5;
+    const maxY = containerRect.bottom - toolbarHeight - 5;
+    y = Math.max(minY, Math.min(y, maxY));
+    
+    // 更新箭头位置
+    const arrowLeft = '50%'; // 保持箭头居中
+    
+    setToolbarState({ x, y, arrowLeft });
+  }, [aiPreview, showPromptInput]);
+
   useEffect(() => {
     const observer = new MutationObserver(() => setIsDarkMode(document.documentElement.classList.contains('dark')));
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
@@ -370,6 +398,7 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
             onClose={cleanupState}
             isVisible={showToolbar}
             showPromptInput={showPromptInput}
+            onPositionChange={handleToolbarPositionChange}
           />
         </div>
       )}

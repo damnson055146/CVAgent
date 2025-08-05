@@ -562,6 +562,7 @@ const generateWordContentForPage = async (pageBlocks, styleConfig, isLastPage, i
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 200 },
                 children: textRuns
+
               }));
             }
           }

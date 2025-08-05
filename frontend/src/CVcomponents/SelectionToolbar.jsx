@@ -16,10 +16,23 @@ const SelectionToolbar = ({
   onCancelPreview,
   onClose,
   isVisible = true,
-  showPromptInput = false // 接收来自父组件的输入框状态
+  showPromptInput = false, // 接收来自父组件的输入框状态
+  onPositionChange // 新增：位置变化回调
 }) => {
   const [customPrompt, setCustomPrompt] = useState('');
   const toolbarRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [currentPosition, setCurrentPosition] = useState(position);
+  
+  // 使用 useRef 来存储事件处理函数，确保引用稳定
+  const mouseMoveHandlerRef = useRef(null);
+  const mouseUpHandlerRef = useRef(null);
+
+  // 更新当前位置
+  useEffect(() => {
+    setCurrentPosition(position);
+  }, [position]);
 
   // 调试信息
   console.log('SelectionToolbar props:', { 
@@ -29,8 +42,78 @@ const SelectionToolbar = ({
     showPromptInput,
     isProcessing,
     processingType,
-    aiPreview 
+    aiPreview,
+    isDragging
   });
+
+  // 拖拽相关事件处理
+  const handleMouseDown = (e) => {
+    // 如果点击的是按钮或输入框，不启动拖拽
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'TEXTAREA' || e.target.closest('button')) {
+      return;
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // 清理之前可能存在的事件监听器
+    if (mouseMoveHandlerRef.current) {
+      document.removeEventListener('mousemove', mouseMoveHandlerRef.current);
+    }
+    if (mouseUpHandlerRef.current) {
+      document.removeEventListener('mouseup', mouseUpHandlerRef.current);
+    }
+    
+    const toolbarRect = toolbarRef.current.getBoundingClientRect();
+    const offsetX = e.clientX - toolbarRect.left;
+    const offsetY = e.clientY - toolbarRect.top;
+    
+    setDragOffset({ x: offsetX, y: offsetY });
+    setIsDragging(true);
+    
+    // 创建稳定的事件处理函数引用
+    mouseMoveHandlerRef.current = (e) => {
+      e.preventDefault();
+      
+      const newX = e.clientX - offsetX;
+      const newY = e.clientY - offsetY;
+      
+      // 直接更新位置，提高响应性
+      onPositionChange?.({ x: newX, y: newY, arrowLeft: '50%' });
+    };
+    
+    mouseUpHandlerRef.current = () => {
+      setIsDragging(false);
+      // 清理事件监听器
+      if (mouseMoveHandlerRef.current) {
+        document.removeEventListener('mousemove', mouseMoveHandlerRef.current);
+      }
+      if (mouseUpHandlerRef.current) {
+        document.removeEventListener('mouseup', mouseUpHandlerRef.current);
+      }
+      // 清空引用
+      mouseMoveHandlerRef.current = null;
+      mouseUpHandlerRef.current = null;
+    };
+    
+    // 添加全局鼠标事件监听，使用 passive: false 提高响应性
+    document.addEventListener('mousemove', mouseMoveHandlerRef.current, { passive: false });
+    document.addEventListener('mouseup', mouseUpHandlerRef.current, { passive: false });
+  };
+
+  // 清理事件监听器
+  useEffect(() => {
+    return () => {
+      if (mouseMoveHandlerRef.current) {
+        document.removeEventListener('mousemove', mouseMoveHandlerRef.current);
+        mouseMoveHandlerRef.current = null;
+      }
+      if (mouseUpHandlerRef.current) {
+        document.removeEventListener('mouseup', mouseUpHandlerRef.current);
+        mouseUpHandlerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleCustomPromptClick = () => {
     onPromptInputToggle?.(true); // 通知父组件显示自定义输入框
@@ -84,19 +167,27 @@ const SelectionToolbar = ({
   return (
     <div
       ref={toolbarRef}
-      className="fixed bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg transform transition-all duration-200"
+      className={`fixed bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg ${
+        isDragging ? 'cursor-grabbing shadow-xl' : 'cursor-grab'
+      }`}
       style={{
-        left: `${position?.x || 0}px`,
-        top: `${position?.y || 0}px`,
+        left: `${currentPosition?.x || 0}px`,
+        top: `${currentPosition?.y || 0}px`,
         minWidth: getToolbarWidth(),
         opacity: isVisible ? 1 : 0,
         transform: `translateY(${isVisible ? '0' : '10px'})`,
         pointerEvents: isVisible ? 'auto' : 'none',
-        zIndex: 9999 // 确保显示在最上层
+        zIndex: 9999, // 确保显示在最上层
+        userSelect: 'none' // 防止拖拽时选中文字
       }}
-      onMouseDown={handleToolbarMouseDown}
+      onMouseDown={handleMouseDown}
       onWheel={handleToolbarWheel}
     >
+      {/* 拖拽指示器 */}
+      <div className="flex items-center justify-center p-1 bg-gray-50 dark:bg-gray-700 rounded-t-lg border-b border-gray-200 dark:border-gray-600 cursor-grab active:cursor-grabbing">
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">拖拽移动</span>
+      </div>
+
       {/* 主工具栏 */}
       <div className="flex items-center p-2 space-x-1">
         <Button
@@ -241,7 +332,7 @@ const SelectionToolbar = ({
         className="absolute w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-white dark:border-t-gray-800"
         style={{
           bottom: '-4px',
-          left: position?.arrowLeft || '50%',
+          left: currentPosition?.arrowLeft || '50%',
           transform: 'translateX(-50%)'
         }}
       />
