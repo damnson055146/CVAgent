@@ -56,6 +56,7 @@ const Sidebar = ({ activeItem, onChange, onLogout }) => {
     { icon: PenTool, label: '个人陈述', color: 'black', id: 0 },
     { icon: MessageSquare, label: '推荐信助手', color: 'black', id: 1 },
     { icon: FileText, label: '简历优化器', color: 'black', id: 2 },
+    { icon: CheckCircle, label: '字体测试', color: 'black', id: 3 },
   ];
 
   const collapsedToolItems = [

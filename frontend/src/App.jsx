@@ -2,12 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './comcomponents/Sidebar';
-import CVPage from './pages/CVPage.jsx';
+import CVPage from './pages/CVpage.jsx';
 import PSGenerator from './pages/PSGenerator.jsx';
 import RecGenerator from './pages/RecGenerator.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
+import FontTestPage from './pages/FontTestPage.jsx';
 import { API_BASE_URL, API_ENDPOINTS } from './config/api.config.js';
 
 const App = () => {
@@ -104,6 +105,8 @@ const App = () => {
                       <PSGenerator />
                     ) : activeItem === 1 ? (
                       <RecGenerator />
+                    ) : activeItem === 3 ? (
+                      <FontTestPage />
                     ) : (
                       <LandingPage onStartExplore={() => setActiveItem(2)} />
                     )}
