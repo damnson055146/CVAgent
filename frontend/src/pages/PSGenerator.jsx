@@ -1,30 +1,18 @@
-import React, { useState } from 'react';
-import { Send, FileText, Edit3, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, FileText, Edit3, Loader2, ChevronUp, RefreshCw } from 'lucide-react';
 import Styleswitch from '../comcomponents/icons/Styleswitch';
 import ModelSelector from '../comcomponents/common/ModelSelector';
+import Button from '../comcomponents/common/Button';
 import { generatePersonalStatement } from '../services/PSagentAPI';
-// Button
-const Button = ({ children, type, size, className, onClick, disabled }) => {
-  const baseClasses = "px-4 py-2 rounded font-medium transition-colors duration-200";
-  const typeClasses = type === "ghost" ? "bg-transparent" : "bg-blue-500 text-white";
-  const sizeClasses = size === "sm" ? "px-3 py-1 text-sm" : "";
-  
-  return (
-    <button
-      className={`${baseClasses} ${typeClasses} ${sizeClasses} ${className}`}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {children}
-    </button>
-  );
-};
 
 
 const PSGenerator = () => {
     const [inputText, setInputText] = useState('');
     const [generatedStatement, setGeneratedStatement] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isRegenerating, setIsRegenerating] = useState(false);
+    const [showRegenerateDropdown, setShowRegenerateDropdown] = useState(false);
+    const [selectedRegenerateModel, setSelectedRegenerateModel] = useState('ChatGPT-4o');
 
     const handleGenerate = async () => {
         if (!inputText.trim()) {
@@ -48,6 +36,46 @@ const PSGenerator = () => {
         setInputText('');
         setGeneratedStatement(null);
     };
+
+    const handleRegenerate = async () => {
+        if (!generatedStatement) {
+            alert('请先生成个人陈述');
+            return;
+        }
+
+        setIsRegenerating(true);
+        try {
+            const result = await generatePersonalStatement(inputText);
+            setGeneratedStatement(result);
+        } catch (error) {
+            console.error('Regeneration error:', error);
+            alert('重新生成个人陈述时出错，请重试');
+        } finally {
+            setIsRegenerating(false);
+        }
+    };
+
+    const regenerateModels = [
+        { id: 'gpt4o', name: 'ChatGPT-4o' },
+        { id: 'claude35', name: 'Claude-3.5' },
+        { id: 'gpt4', name: 'ChatGPT-4' },
+        { id: 'claude3', name: 'Claude-3' }
+    ];
+
+    const regenerateDropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (regenerateDropdownRef.current && !regenerateDropdownRef.current.contains(event.target)) {
+                setShowRegenerateDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const copyToClipboard = () => {
         if (!generatedStatement || !generatedStatement.个人陈述) return;
@@ -108,9 +136,12 @@ const PSGenerator = () => {
             <div className="flex-1 flex flex-row gap-4 p-4">
                 <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col shadow-sm">
                     <div className="flex justify-between items-center mb-4">
-                        <div className="flex items-center gap-2">
-                            <Edit3 className="text-gray-600 dark:text-gray-400" size={24} />
-                            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">原始个人陈述</h2>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <Edit3 className="text-gray-600 dark:text-gray-400" size={24} />
+                                <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">原始个人陈述</h2>
+                            </div>
+                            <ModelSelector />
                         </div>
                         <div className="flex gap-2">
                             <Button
@@ -129,6 +160,43 @@ const PSGenerator = () => {
                                     "润色"
                                 )}
                             </Button>
+                            
+                            <div className="relative" ref={regenerateDropdownRef}>
+                                <Button
+                                    type="ghost"
+                                    size="sm"
+                                    className="hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors whitespace-nowrap text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 flex items-center gap-1"
+                                    onClick={() => setShowRegenerateDropdown(!showRegenerateDropdown)}
+                                    disabled={!generatedStatement}
+                                >
+                                    <RefreshCw size={16} />
+                                    重生成
+                                    <ChevronUp size={14} className={`transition-transform ${showRegenerateDropdown ? 'rotate-180' : ''}`} />
+                                </Button>
+                                
+                                {showRegenerateDropdown && (
+                                    <div className="absolute top-full mt-1 right-0 w-48 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg z-20">
+                                        <div className="py-1">
+                                            {regenerateModels.map((model) => (
+                                                <div
+                                                    key={model.id}
+                                                    className={`px-3 py-2 cursor-pointer transition-colors duration-150
+                                                      hover:bg-gray-50 dark:hover:bg-gray-600
+                                                      ${selectedRegenerateModel === model.name ? 'bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100' : ''}`}
+                                                    onClick={() => {
+                                                        setSelectedRegenerateModel(model.name);
+                                                        setShowRegenerateDropdown(false);
+                                                        handleRegenerate();
+                                                    }}
+                                                >
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{model.name}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            
                             <Button
                                 type="ghost"
                                 size="sm"
@@ -146,9 +214,6 @@ const PSGenerator = () => {
                         placeholder="请在此输入您的个人陈述内容..."
                         className="w-full flex-1 p-4 border border-gray-200 dark:border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-700 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400"
                     />
-                    
-                    {/* 模型选择 */}
-                    <ModelSelector />
                 </div>
 
                 <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col shadow-sm">

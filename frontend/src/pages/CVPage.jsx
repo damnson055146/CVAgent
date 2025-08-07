@@ -9,6 +9,7 @@ import Button from '../comcomponents/common/Button.jsx';
 import ResumeForm from '../CVcomponents/ResumeForm.jsx';
 import PreviewEditor from '../CVcomponents/PreviewEditor.jsx';
 import Editbar from '../CVcomponents/Editbar.jsx';
+import ModelSelector from '../comcomponents/common/ModelSelector';
 import { createHistoryItem, saveHistoryItem, AutoSaveManager } from '../utils/historyUtils.js';
 
 const CVPage = () => {
@@ -23,6 +24,7 @@ const CVPage = () => {
   const [showResumeForm, setShowResumeForm] = useState(false);
   const [theme, setTheme] = useState('style1');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const previewRef = useRef();
   const editorRef = useRef(); // 新增：PreviewEditor的ref
   const autoSaveManagerRef = useRef();
@@ -247,7 +249,10 @@ const CVPage = () => {
     <div className="flex-1 flex flex-col h-full w-full">
       {/* 顶部导航栏 */}
       <header className="h-20 flex items-center px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 font-bold text-lg text-black-700 dark:text-white shadow-sm justify-between">
-        <span>简历优化器</span>
+        <div className="flex items-center gap-4">
+          <span className="text-lg font-bold">简历优化器</span>
+          <ModelSelector />
+        </div>
         <div className="flex gap-3">
           <Button type="primary" size="sm" onClick={() => setShowUploadCV(true)}>上传简历</Button>
           <Button type="ghost" size="sm" onClick={() => setShowResumeForm(true)}>填写简历</Button>

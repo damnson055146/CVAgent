@@ -409,7 +409,7 @@ const parseMarkdownToWordElements = (text, styleConfig, alignment = null) => {
 
       // 为H2添加下划线 - 使用表格创建精确的下划线
       if (level === 2 && headingStyle.border) {
-        // 创建标题段落（不包含下划线）
+        // 标题段落
         elements.push(new Paragraph({
           ...paragraphOptions,
           children: [new TextRun({
@@ -421,7 +421,7 @@ const parseMarkdownToWordElements = (text, styleConfig, alignment = null) => {
           })]
         }));
         
-        // 创建下划线 - 使用段落边框创建真正的线条
+        // 下划线 - 使用段落边框
         elements.push(createUnderlineWithBorder(
           headingStyle.border.bottom.color || '494949',
           6
@@ -869,7 +869,7 @@ export const generateWordContentForPage = async (pageBlocks, styleConfig, isLast
   return children;
 }; 
 
-// 备选方案：使用段落边框创建下划线
+// 使用段落边框创建下划线
 const createUnderlineWithBorder = (color = '494949', size = 6) => {
   return new Paragraph({
     spacing: { before: 30, after: 30 },
