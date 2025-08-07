@@ -41,7 +41,7 @@ Sep 2019 - Jun 2023
       boldText: '**Xi\'an Jiaotong-Liverpool University** 应该正确显示为粗体',
       centerAlignment: 'solocenter块内的内容应该居中对齐',
       h1InSolocenter: 'solocenter块内的H1标题应该保持H1字体大小和样式，但居中对齐',
-      h2Underline: 'H2标题应该有下划线',
+      h2Underline: 'H2标题应该有占满页面宽度的下划线（使用段落边框）',
       listItems: '列表项应该只缩进，不显示项目符号',
       nestedFormatting: '复杂格式如buil*ding int*ernal应该正确渲染'
     }

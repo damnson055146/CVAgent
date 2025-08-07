@@ -3,6 +3,21 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Page
 import { saveAs } from 'file-saver';
 import { parseCustomBlocks } from './markdownParser.js';
 
+// 下划线配置
+const UNDERLINE_CONFIG = {
+  char: '─', // 下划线字符：─, _, -, ▬, █
+  fontSize: 8, // 字体大小，使线条更细
+  spacing: { before: 30, after: 30 } // 上下间距
+};
+
+// Word页面配置
+const WORD_PAGE_CONFIG = {
+  width: 11906, // A4宽度 (EMUs)
+  height: 16838, // A4高度 (EMUs)
+  margin: 1440, // 页面边距 (EMUs)
+  availableWidth: 11906 - (1440 * 2) // 可用宽度
+};
+
 // Word样式配置 - 完全匹配预览区CSS
 const WORD_STYLE_CONFIG = {
   style1: {
@@ -400,42 +415,17 @@ const parseMarkdownToWordElements = (text, styleConfig, alignment = null) => {
           children: [new TextRun({
             text: processedHeadingText,
             size: headingStyle.fontSize,
-            font: actualFont,
-            bold: actualBold,
+            font: getFontForText(processedHeadingText, styleConfig.baseFont), // 使用实际字体
+            bold: headingStyle.bold,
             color: headingStyle.color
           })]
         }));
         
-        // 创建下划线表格
-        const underlineTable = new Table({
-          width: {
-            size: 100,
-            type: WidthType.PERCENTAGE,
-          },
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({
-                  children: [new Paragraph({
-                    children: [new TextRun({ text: '' })]
-                  })],
-                  borders: {
-                    top: { style: BorderStyle.NIL },
-                    left: { style: BorderStyle.NIL },
-                    right: { style: BorderStyle.NIL },
-                    bottom: {
-                      style: BorderStyle.SINGLE,
-                      size: headingStyle.border.bottom.size || 6,
-                      color: headingStyle.border.bottom.color || '494949'
-                    }
-                  }
-                })
-              ]
-            })
-          ]
-        });
-        
-        elements.push(underlineTable);
+        // 创建下划线 - 使用段落边框创建真正的线条
+        elements.push(createUnderlineWithBorder(
+          headingStyle.border.bottom.color || '494949',
+          6
+        ));
         
         // 添加下划线后的间距
         elements.push(new Paragraph({
@@ -473,23 +463,12 @@ const parseMarkdownToWordElements = (text, styleConfig, alignment = null) => {
     
     // 处理分割线
     if (text.trim() === '---' || text.trim() === '***') {
-      const hrOptions = {
-        spacing: styleConfig.hr.spacing,
-        children: [
-          new TextRun({
-            text: '─'.repeat(50),
-            size: styleConfig.paragraph.fontSize,
-            font: styleConfig.baseFont,
-            color: styleConfig.hr.color
-          })
-        ]
-      };
+      // 使用段落边框创建分割线
+      elements.push(createHrWithBorder(
+        styleConfig.hr.color,
+        6
+      ));
       
-      if (alignment) {
-        hrOptions.alignment = alignment;
-      }
-      
-      elements.push(new Paragraph(hrOptions));
       return elements;
     }
     
@@ -674,42 +653,17 @@ const generateWordContent = (blocks, config) => {
                 children: [new TextRun({
                   text: headingText,
                   size: headingStyle.fontSize,
-                  font: config.baseFont,
+                  font: getFontForText(headingText, config.baseFont), // 使用实际字体
                   bold: headingStyle.bold,
                   color: headingStyle.color
                 })]
               }));
               
-              // 创建下划线表格
-              const underlineTable = new Table({
-                width: {
-                  size: 100,
-                  type: WidthType.PERCENTAGE,
-                },
-                rows: [
-                  new TableRow({
-                    children: [
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({ text: '' })]
-                        })],
-                        borders: {
-                          top: { style: BorderStyle.NIL },
-                          left: { style: BorderStyle.NIL },
-                          right: { style: BorderStyle.NIL },
-                          bottom: {
-                            style: BorderStyle.SINGLE,
-                            size: headingStyle.border.bottom.size || 6,
-                            color: headingStyle.border.bottom.color || '494949'
-                          }
-                        }
-                      })
-                    ]
-                  })
-                ]
-              });
-              
-              children.push(underlineTable);
+              // 创建下划线 - 使用段落边框创建真正的线条
+              children.push(createUnderlineWithBorder(
+                headingStyle.border.bottom.color || '494949',
+                6
+              ));
               
               // 添加下划线后的间距
               children.push(new Paragraph({
@@ -723,7 +677,7 @@ const generateWordContent = (blocks, config) => {
                 children: [new TextRun({
                   text: headingText,
                   size: headingStyle.fontSize,
-                  font: config.baseFont,
+                  font: getFontForText(headingText, config.baseFont), // 使用实际字体
                   bold: headingStyle.bold,
                   color: headingStyle.color
                 })]
@@ -913,4 +867,34 @@ export const generateWordContentForPage = async (pageBlocks, styleConfig, isLast
   }
   
   return children;
+}; 
+
+// 备选方案：使用段落边框创建下划线
+const createUnderlineWithBorder = (color = '494949', size = 6) => {
+  return new Paragraph({
+    spacing: { before: 30, after: 30 },
+    border: {
+      bottom: {
+        style: BorderStyle.SINGLE,
+        size: size,
+        color: color
+      }
+    },
+    children: [new TextRun({ text: '' })]
+  });
+};
+
+// 备选方案：使用段落边框创建分割线
+const createHrWithBorder = (color = 'B6C6E3', size = 6) => {
+  return new Paragraph({
+    spacing: { before: 60, after: 60 },
+    border: {
+      bottom: {
+        style: BorderStyle.DASHED,
+        size: size,
+        color: color
+      }
+    },
+    children: [new TextRun({ text: '' })]
+  });
 }; 
