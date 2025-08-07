@@ -15,32 +15,32 @@ const PDF_STYLE_CONFIG = {
     baseFontSize: 12, // pt
     lineHeight: 1.5,
     
-    // 标题样式配置 - 完全匹配Word样式
+    // 标题样式配置 - 与预览区保持一致
     h1: {
       fontSize: 22, // 与Word保持一致：44pt/2 (PDF单位是pt，Word是半点)
       color: [0, 0, 0], // 黑色
       bold: true,
-      spacing: { after: 8, before: 4 },
+      spacing: { after: 6, before: 6 }, // mb-4 = 16px ≈ 6mm
     },
     h2: {
       fontSize: 16, // 与Word保持一致：32pt/2
       color: [0, 0, 0], // 黑色
       bold: true,
-      spacing: { after: 5, before: 2 },
+      spacing: { after: 4, before: 4 }, // mb-3 = 12px ≈ 4mm
       border: { bottom: { style: 'solid', width: 0.3, color: [73, 73, 73] } },
     },
     h3: {
       fontSize: 12, // 与Word保持一致：24pt/2
       color: [37, 99, 235], // #2563eb 蓝色
       bold: true,
-      spacing: { after: 5, before: 4 },
+      spacing: { after: 3, before: 3 }, // mb-2 = 8px ≈ 3mm
     },
     
-    // 文本样式 - 匹配Word样式
+    // 文本样式 - 与预览区保持一致
     paragraph: {
       fontSize: 12, // 与Word保持一致：24pt/2
       color: [0, 0, 0],
-      spacing: { after: 4 },
+      spacing: { after: 3 }, // mb-2 = 8px ≈ 3mm
       lineHeight: 1.4,
     },
     
@@ -247,6 +247,11 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
   if (!content) throw new Error('无内容可生成PDF');
   console.log('开始生成PDF，使用匹配Word的渲染逻辑...');
 
+  // 添加超时保护
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('PDF生成超时')), 30000); // 30秒超时
+  });
+
   try {
     // 确保msyh字体已加载
     await loadMsyhFont();
@@ -257,7 +262,7 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
     const styleConfig = generatePdfStyleConfig(config);
     console.log('PDF样式配置:', styleConfig);
   
-  // 智能字体选择函数 - 确保中文字体使用msyh
+  // 智能字体选择函数 - 中文字符使用msyh，英文保持原字体
   const getFontForText = (text, baseFont = 'helvetica') => {
     if (!text || typeof text !== 'string') {
       return baseFont;
@@ -274,7 +279,7 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
     return baseFont;
   };
 
-  // 智能字体样式选择函数 - 中文字符强制使用normal样式
+  // 智能字体样式选择函数 - 中文字符使用normal，英文保持原样式
   const getFontStyleForText = (text, desiredStyle = 'normal') => {
     if (!text || typeof text !== 'string') {
       return desiredStyle;
@@ -284,11 +289,16 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
     const hasChineseChars = /[\u4e00-\u9fff]/.test(text);
     
     if (hasChineseChars) {
-      console.log('检测到中文字符，强制使用normal样式');
-      return 'normal'; // 中文字符强制使用normal样式
+      console.log('检测到中文字符，使用normal样式');
+      return 'normal'; // 中文字符使用normal样式
     }
     
-    return desiredStyle;
+    // 对于英文文本，支持所有样式包括bolditalic
+    if (desiredStyle === 'bolditalic') {
+      return 'bolditalic';
+    }
+    
+    return desiredStyle; // 英文保持原样式（粗体、斜体等）
   };
   
   // 检测整体内容是否包含中文，用于设置默认字体
@@ -363,8 +373,8 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
     return text;
   };
 
-  // 渲染带格式的文本行 - 匹配Word的parseInlineFormatting逻辑
-  const renderFormattedText = (doc, text, x, y, style, alignment = 'left') => {
+  // 渲染带格式的文本行 - 支持嵌套格式（斜体+粗体）
+  const renderFormattedText = (doc, text, x, y, style, alignment = 'left', isHeading = false) => {
     if (!text || typeof text !== 'string') {
       return 0;
     }
@@ -375,48 +385,153 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
     const NORMAL_COLOR = Array.isArray(style.color) ? style.color : [0,0,0];
     const STRONG_COLOR = Array.isArray(styleConfig.strong.color) ? styleConfig.strong.color : [34, 34, 59];
 
-    // 处理粗体和斜体格式
-    const parts = text.split(/(\*\*.*?\*\*|(?<!\*)\*[^*]+\*(?!\*))/g).filter(p => p);
+    // 如果是标题，整个文本都是粗体
+    if (isHeading && style.bold) {
+      const actualFontName = getFontForText(text, FONT_NAME);
+      const actualFontStyle = getFontStyleForText(text, 'bold'); // 标题允许粗体
+      
+      try {
+        doc.setFont(actualFontName, actualFontStyle);
+        doc.setFontSize(FONT_SIZE);
+        doc.setTextColor(...NORMAL_COLOR);
+        doc.text(text, x, y);
+        return doc.getTextWidth(text);
+      } catch (fontError) {
+        console.warn(`设置标题字体失败: ${actualFontName} ${actualFontStyle}`, fontError);
+        // 回退到普通字体
+        doc.setFont(actualFontName, 'normal');
+        doc.setFontSize(FONT_SIZE);
+        doc.setTextColor(...NORMAL_COLOR);
+        doc.text(text, x, y);
+        return doc.getTextWidth(text);
+      }
+    }
+
+    // 解析嵌套格式的标记 - 支持复杂的嵌套格式
+    const parseFormattedText = (text) => {
+      const tokens = [];
+      let currentIndex = 0;
+      let currentItalic = false; // 跟踪当前是否在斜体范围内
+      let loopCount = 0; // 防止无限循环
+      const maxLoops = text.length * 2; // 最大循环次数
+      
+      while (currentIndex < text.length && loopCount < maxLoops) {
+        loopCount++;
+        // 查找下一个格式标记
+        const boldMatch = text.slice(currentIndex).match(/^\*\*([^*]+)\*\*/);
+        const italicStartMatch = text.slice(currentIndex).match(/^\*([^*]+)/);
+        const italicEndMatch = currentItalic ? text.slice(currentIndex).match(/^\*/) : null;
+        
+        if (boldMatch) {
+          // 处理粗体文本
+          const boldText = boldMatch[1];
+          tokens.push({
+            text: boldText,
+            isBold: true,
+            isItalic: currentItalic
+          });
+          currentIndex += boldMatch[0].length;
+        } else if (!currentItalic && italicStartMatch) {
+          // 开始斜体
+          currentItalic = true;
+          const italicText = italicStartMatch[1];
+          tokens.push({
+            text: italicText,
+            isBold: false,
+            isItalic: true
+          });
+          currentIndex += italicStartMatch[0].length;
+        } else if (currentItalic && italicEndMatch) {
+          // 结束斜体
+          currentItalic = false;
+          currentIndex += 1; // 跳过结束的 *
+        } else {
+          // 处理普通文本
+          const nextBold = text.indexOf('**', currentIndex);
+          const nextItalic = text.indexOf('*', currentIndex);
+          
+          let endIndex = text.length;
+          if (nextBold !== -1 && (nextItalic === -1 || nextBold < nextItalic)) {
+            endIndex = nextBold;
+          } else if (nextItalic !== -1) {
+            endIndex = nextItalic;
+          }
+          
+          const plainText = text.slice(currentIndex, endIndex);
+          if (plainText) {
+            tokens.push({
+              text: plainText,
+              isBold: false,
+              isItalic: currentItalic
+            });
+          }
+          
+          // 防止无限循环：确保currentIndex向前移动
+          if (endIndex <= currentIndex) {
+            console.warn('检测到可能的无限循环，跳过当前字符:', text[currentIndex]);
+            currentIndex += 1;
+          } else {
+            currentIndex = endIndex;
+          }
+        }
+      }
+      
+      // 检查是否因为循环次数限制而退出
+      if (loopCount >= maxLoops) {
+        console.warn('parseFormattedText达到最大循环次数，可能存在格式问题:', text);
+        // 添加剩余的文本作为普通文本
+        if (currentIndex < text.length) {
+          tokens.push({
+            text: text.slice(currentIndex),
+            isBold: false,
+            isItalic: currentItalic
+          });
+        }
+      }
+      
+      return tokens;
+    };
+
+    // 解析文本为格式化的token
+    const tokens = parseFormattedText(text);
     let currentX = x;
 
-    parts.forEach(part => {
-      const isBold = part.startsWith('**') && part.endsWith('**');
-      const isItalic = !isBold && part.startsWith('*') && part.endsWith('*') && !part.startsWith('**');
+    // 渲染每个token
+    tokens.forEach(token => {
+      let fontStyle = 'normal';
       
-      let partText = part;
-      let desiredStyle = 'normal';
-      
-      if (isBold) {
-        partText = part.slice(2, -2);
-        desiredStyle = 'bold';
-      } else if (isItalic) {
-        partText = part.slice(1, -1);
-        desiredStyle = 'italic';
+      // 确定字体样式（支持粗体+斜体组合）
+      if (token.isBold && token.isItalic) {
+        fontStyle = 'bolditalic';
+      } else if (token.isBold) {
+        fontStyle = 'bold';
+      } else if (token.isItalic) {
+        fontStyle = 'italic';
       }
 
-      // 使用智能字体样式选择 - 中文字符强制使用normal样式
-      const actualFontStyle = getFontStyleForText(partText, desiredStyle);
-      const actualFontName = getFontForText(partText, FONT_NAME);
+      // 使用智能字体样式选择
+      const actualFontStyle = getFontStyleForText(token.text, fontStyle);
+      const actualFontName = getFontForText(token.text, FONT_NAME);
 
       // 设置字体和样式
       try {
         doc.setFont(actualFontName, actualFontStyle);
         doc.setFontSize(FONT_SIZE);
-        doc.setTextColor(...(isBold ? STRONG_COLOR : NORMAL_COLOR));
+        doc.setTextColor(...(token.isBold ? STRONG_COLOR : NORMAL_COLOR));
       } catch (fontError) {
         console.warn(`设置字体失败: ${actualFontName} ${actualFontStyle}`, fontError);
         // 回退到普通字体
         doc.setFont(actualFontName, 'normal');
         doc.setFontSize(FONT_SIZE);
-        doc.setTextColor(...(isBold ? STRONG_COLOR : NORMAL_COLOR));
+        doc.setTextColor(...(token.isBold ? STRONG_COLOR : NORMAL_COLOR));
       }
 
       try {
-        doc.text(partText, currentX, y);
-        currentX += doc.getTextWidth(partText);
+        doc.text(token.text, currentX, y);
+        currentX += doc.getTextWidth(token.text);
       } catch (e) {
-        console.warn(`PDF文本渲染失败: "${partText}"`, e);
-        const safeText = partText.replace(/[^\x00-\x7F]/g, '?');
+        console.warn(`PDF文本渲染失败: "${token.text}"`, e);
+        const safeText = token.text.replace(/[^\x00-\x7F]/g, '?');
         doc.text(safeText, currentX, y);
         currentX += doc.getTextWidth(safeText);
       }
@@ -541,30 +656,40 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
           
           yPos = checkPageBreak(yPos, textHeight);
           
-          // 根据对齐方式渲染文本
-          if (alignment === 'center') {
-            doc.text(textLines, A4_WIDTH_MM / 2, yPos, { align: 'center' });
-          } else if (alignment === 'right') {
-            const textWidth = doc.getTextWidth(text);
-            const rightX = A4_WIDTH_MM - pageMargin - textWidth;
-            doc.text(textLines, rightX, yPos);
-          } else {
-            doc.text(textLines, pageMargin, yPos);
-          }
+          // 根据对齐方式渲染文本 - 使用renderFormattedText处理混合字体
+          const titleStartY = yPos; // 记录标题开始位置
           
-          yPos += textHeight;
+          for (const textLine of textLines) {
+            yPos = checkPageBreak(yPos, ptToMm(style.fontSize));
+            
+            if (alignment === 'center') {
+              const textWidth = doc.getTextWidth(textLine);
+              const centerX = (A4_WIDTH_MM - textWidth) / 2;
+              renderFormattedText(doc, textLine, centerX, yPos, style, alignment, true); // 标题
+            } else if (alignment === 'right') {
+              const textWidth = doc.getTextWidth(textLine);
+              const rightX = A4_WIDTH_MM - pageMargin - textWidth;
+              renderFormattedText(doc, textLine, rightX, yPos, style, alignment, true); // 标题
+            } else {
+              renderFormattedText(doc, textLine, pageMargin, yPos, style, alignment, true); // 标题
+            }
+            
+            yPos += ptToMm(style.fontSize) * (style.lineHeight || 1.2);
+          }
           
           // 处理H2下划线
           if (level === 2 && style.border) {
-            const paddingBottomMm = ptToMm(styleConfig.baseFontSize) * 0.4;
-            const underlineY = yPos + paddingBottomMm;
+            // 计算标题文字的实际底部位置
+            const titleBottomY = yPos - ptToMm(style.fontSize) * (style.lineHeight || 1.2);
+            const paddingBottomMm = ptToMm(style.fontSize) * 0.4; // H2中下划线与文字的间距
+            const underlineY = titleBottomY + paddingBottomMm;
             
             yPos = checkPageBreak(underlineY, style.border.bottom.width);
             
             doc.setDrawColor(...style.border.bottom.color);
             doc.setLineWidth(style.border.bottom.width);
             doc.line(pageMargin, underlineY, A4_WIDTH_MM - pageMargin, underlineY);
-            yPos = underlineY + 0.5;
+            yPos = underlineY + 2.5; // 下划线后的间距
           }
           
           yPos += style.spacing.after;
@@ -618,14 +743,11 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
           doc.setFontSize(style.fontSize);
           doc.setTextColor(...style.color);
           
-          const textLines = doc.splitTextToSize(text, contentWidth - style.indent.left - 2);
+          const textLines = doc.splitTextToSize(text, contentWidth - style.indent.left);
           const textHeight = textLines.length * ptToMm(style.fontSize) * (styleConfig.paragraph.lineHeight || 1.2);
           yPos = checkPageBreak(yPos, textHeight);
           
-          // 渲染项目符号
-          doc.text(style.bullet, pageMargin, yPos);
-          
-          // 渲染列表文本
+          // 渲染列表文本 - 只缩进，不显示项目符号
           for (const line of textLines) {
             renderFormattedText(doc, line, pageMargin + style.indent.left, yPos, styleConfig.paragraph, alignment);
             yPos += ptToMm(style.fontSize) * styleConfig.paragraph.lineHeight;
@@ -751,6 +873,34 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
           }
         }
       }
+      else if (block.type === 'heading') {
+        // 处理标题块 - 这是缺失的关键部分！
+        const { level, content: headingText, alignment } = block;
+        
+        console.log(`PDF处理标题块: 级别=${level}, 内容="${headingText}", 对齐=${alignment}`);
+        
+        // 根据标题级别选择样式
+        let headingStyle;
+        if (level === 1) {
+          headingStyle = styleConfig.h1;
+        } else if (level === 2) {
+          headingStyle = styleConfig.h2;
+        } else {
+          headingStyle = styleConfig.h3;
+        }
+        
+        // 创建标题元素
+        const headingElement = {
+          type: 'heading',
+          level: level,
+          text: headingText,
+          style: headingStyle,
+          alignment: alignment ? getAlignmentType(alignment) : 'left'
+        };
+        
+        // 渲染标题元素
+        yPos = renderPdfElement(doc, headingElement, yPos, PAGE_MARGIN, CONTENT_WIDTH, checkPageBreak, ptToMm, DEFAULT_FONT);
+      }
       else if (block.type === 'normal') {
         const text = block.content || '';
         if (text && typeof text === 'string' && text.trim()) {
@@ -801,26 +951,23 @@ export const generateSimplePdfV2 = generateAdvancedPdf;
 // 添加字体测试函数
 export const testFontInPdf = async () => {
   try {
-    // 创建一个简单的测试内容
-    const testContent = `# 字体测试
-## 中文测试
-**粗体文本测试**
-*斜体文本测试*
-\`代码文本测试\`
+    // 创建一个简单的测试内容，避免复杂的嵌套格式
+    const testContent = `# 个人简历
 
+## EDUCATION
 ::: left
-左对齐文本
+Xi'an Jiaotong-Liverpool University
+BSc Applied Mathematics
 :::
 ::: right
-右对齐文本
-:::
-::: center
-居中对齐文本
+Suzhou, China
+Sep 2019 - Jun 2023
 :::
 
-- 列表项1
-- 列表项2
-- 列表项3
+## SKILLS
+- 编程语言: JavaScript, Python, Java
+- 框架: React, Vue.js, Django
+- 数据库: MySQL, MongoDB
 
 ---
 
@@ -831,20 +978,23 @@ export const testFontInPdf = async () => {
       font: 'SimSun',
       fontSize: 12,
       lineHeight: 1.5
-    }, { user_name: '字体测试' });
+    }, { user_name: '简单测试' });
 
     return {
       success: true,
-      message: 'PDF字体测试成功！',
+      message: 'PDF简单测试成功！',
       details: {
         font: 'SimSun',
         fontSize: 12,
         lineHeight: 1.5,
-        contentLength: testContent.length
+        contentLength: testContent.length,
+        hasHeadings: true,
+        hasLists: true,
+        hasH2Underline: true
       }
     };
   } catch (error) {
-    console.error('PDF字体测试失败:', error);
+    console.error('PDF简单测试失败:', error);
     return {
       success: false,
       error: error.message,
