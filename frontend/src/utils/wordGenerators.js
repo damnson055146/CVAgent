@@ -1,5 +1,5 @@
 // Word文档生成器 - 包含所有Word生成相关函数
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak, Table, TableRow, TableCell, BorderStyle, WidthType } from 'docx';
 import { saveAs } from 'file-saver';
 import { parseCustomBlocks } from './markdownParser.js';
 
@@ -96,7 +96,8 @@ const generateWordStyleConfig = (config) => {
       spacing: {
         after: Math.round(baseStyleConfig.h2.spacing.after * spacingRatio),
         before: Math.round(baseStyleConfig.h2.spacing.before * spacingRatio)
-      }
+      },
+      border: baseStyleConfig.h2.border // 确保border配置被正确传递
     },
     h3: {
       ...baseStyleConfig.h3,
@@ -266,7 +267,9 @@ const parseInlineFormatting = (text, styleConfig) => {
         if (endIndex !== -1) {
           const content = remainingText.substring(nextIndex + 2, endIndex);
           const actualFont = getFontForText(content, styleConfig.baseFont);
-          const actualBold = getFontStyleForText(content, true) === 'bold';
+          
+          // 修复粗体逻辑：对于英文文本，允许粗体；对于中文文本，也允许粗体（与PDF保持一致）
+          const actualBold = true; // 粗体标记内的文本总是粗体
           
           textRuns.push(new TextRun({
             text: content,
@@ -389,17 +392,59 @@ const parseMarkdownToWordElements = (text, styleConfig, alignment = null) => {
         spacing: headingStyle.spacing
       };
 
-      // 为H2添加下划线
+      // 为H2添加下划线 - 使用表格创建精确的下划线
       if (level === 2 && headingStyle.border) {
-        paragraphOptions.border = {
-          bottom: {
-            color: headingStyle.border.bottom.color,
-            space: 1,
-            value: 'single',
-            size: headingStyle.border.bottom.size
-          }
-        };
-        paragraphOptions.spacing.after = (paragraphOptions.spacing.after || 0) + 120;
+        // 创建标题段落（不包含下划线）
+        elements.push(new Paragraph({
+          ...paragraphOptions,
+          children: [new TextRun({
+            text: processedHeadingText,
+            size: headingStyle.fontSize,
+            font: actualFont,
+            bold: actualBold,
+            color: headingStyle.color
+          })]
+        }));
+        
+        // 创建下划线表格
+        const underlineTable = new Table({
+          width: {
+            size: 100,
+            type: WidthType.PERCENTAGE,
+          },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [new Paragraph({
+                    children: [new TextRun({ text: '' })]
+                  })],
+                  borders: {
+                    top: { style: BorderStyle.NIL },
+                    left: { style: BorderStyle.NIL },
+                    right: { style: BorderStyle.NIL },
+                    bottom: {
+                      style: BorderStyle.SINGLE,
+                      size: headingStyle.border.bottom.size || 6,
+                      color: headingStyle.border.bottom.color || '494949'
+                    }
+                  }
+                })
+              ]
+            })
+          ]
+        });
+        
+        elements.push(underlineTable);
+        
+        // 添加下划线后的间距
+        elements.push(new Paragraph({
+          spacing: { after: 120 },
+          children: [new TextRun({ text: '' })]
+        }));
+        
+        console.log(`处理${level}级标题: ${processedHeadingText}, 字体大小: ${headingStyle.fontSize}, 粗体: ${headingStyle.bold}, 添加下划线`);
+        return elements;
       }
       
       if (alignment) {
@@ -407,8 +452,10 @@ const parseMarkdownToWordElements = (text, styleConfig, alignment = null) => {
       }
       
       const actualFont = getFontForText(processedHeadingText, styleConfig.baseFont);
-      const actualBold = getFontStyleForText(processedHeadingText, headingStyle.bold ? 'bold' : 'normal') === 'bold';
+      // 标题总是粗体，不受字体样式选择函数影响
+      const actualBold = headingStyle.bold;
       
+      // 对于非H2标题，直接创建段落
       elements.push(new Paragraph({
         ...paragraphOptions,
         children: [new TextRun({
@@ -446,16 +493,13 @@ const parseMarkdownToWordElements = (text, styleConfig, alignment = null) => {
       return elements;
     }
     
-    // 处理列表项
+    // 处理列表项 - 只缩进，不显示项目符号（与PDF保持一致）
     const listMatch = text.match(/^\s*[-*+]\s*(.+)$/);
     if (listMatch) {
       const listText = listMatch[1];
       const listTextRuns = parseInlineFormatting(listText, styleConfig);
       
       const listOptions = {
-        bullet: {
-          level: 0
-        },
         spacing: styleConfig.list.spacing,
         indent: styleConfig.list.indent,
         children: listTextRuns
@@ -622,29 +666,69 @@ const generateWordContent = (blocks, config) => {
               spacing: headingStyle.spacing
             };
 
-            // 为H2添加下划线
+            // 为H2添加下划线 - 使用表格创建精确的下划线
             if (headingLevel === 2 && headingStyle.border) {
-              paragraphOptions.border = {
-                bottom: {
-                  color: headingStyle.border.bottom.color,
-                  space: 1,
-                  value: 'single',
-                  size: headingStyle.border.bottom.size
-                }
-              };
-              paragraphOptions.spacing.after = (paragraphOptions.spacing.after || 0) + 120;
+              // 创建标题段落（不包含下划线）
+              children.push(new Paragraph({
+                ...paragraphOptions,
+                children: [new TextRun({
+                  text: headingText,
+                  size: headingStyle.fontSize,
+                  font: config.baseFont,
+                  bold: headingStyle.bold,
+                  color: headingStyle.color
+                })]
+              }));
+              
+              // 创建下划线表格
+              const underlineTable = new Table({
+                width: {
+                  size: 100,
+                  type: WidthType.PERCENTAGE,
+                },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({ text: '' })]
+                        })],
+                        borders: {
+                          top: { style: BorderStyle.NIL },
+                          left: { style: BorderStyle.NIL },
+                          right: { style: BorderStyle.NIL },
+                          bottom: {
+                            style: BorderStyle.SINGLE,
+                            size: headingStyle.border.bottom.size || 6,
+                            color: headingStyle.border.bottom.color || '494949'
+                          }
+                        }
+                      })
+                    ]
+                  })
+                ]
+              });
+              
+              children.push(underlineTable);
+              
+              // 添加下划线后的间距
+              children.push(new Paragraph({
+                spacing: { after: 120 },
+                children: [new TextRun({ text: '' })]
+              }));
+            } else {
+              // 对于非H2标题，直接创建段落
+              children.push(new Paragraph({
+                ...paragraphOptions,
+                children: [new TextRun({
+                  text: headingText,
+                  size: headingStyle.fontSize,
+                  font: config.baseFont,
+                  bold: headingStyle.bold,
+                  color: headingStyle.color
+                })]
+              }));
             }
-            
-            children.push(new Paragraph({
-              ...paragraphOptions,
-              children: [new TextRun({
-                text: headingText,
-                size: headingStyle.fontSize,
-                font: config.baseFont,
-                bold: headingStyle.bold,
-                color: headingStyle.color
-              })]
-            }));
             
             console.log(`处理${headingLevel}级标题: ${headingText}, 字体大小: ${headingStyle.fontSize}, 粗体: ${headingStyle.bold}`);
           }

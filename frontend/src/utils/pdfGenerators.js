@@ -747,9 +747,22 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
           const textHeight = textLines.length * ptToMm(style.fontSize) * (styleConfig.paragraph.lineHeight || 1.2);
           yPos = checkPageBreak(yPos, textHeight);
           
-          // 渲染列表文本 - 只缩进，不显示项目符号
+          // 渲染列表文本 - 根据对齐方式渲染
           for (const line of textLines) {
-            renderFormattedText(doc, line, pageMargin + style.indent.left, yPos, styleConfig.paragraph, alignment);
+            if (alignment === 'center') {
+              // 居中对齐：计算文本宽度，然后居中显示
+              const textWidth = doc.getTextWidth(line);
+              const centerX = (A4_WIDTH_MM - textWidth) / 2;
+              renderFormattedText(doc, line, centerX, yPos, styleConfig.paragraph, alignment);
+            } else if (alignment === 'right') {
+              // 右对齐：计算文本宽度，然后右对齐显示
+              const textWidth = doc.getTextWidth(line);
+              const rightX = A4_WIDTH_MM - pageMargin - textWidth;
+              renderFormattedText(doc, line, rightX, yPos, styleConfig.paragraph, alignment);
+            } else {
+              // 左对齐：使用缩进
+              renderFormattedText(doc, line, pageMargin + style.indent.left, yPos, styleConfig.paragraph, alignment);
+            }
             yPos += ptToMm(style.fontSize) * styleConfig.paragraph.lineHeight;
           }
           
@@ -874,7 +887,7 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
         }
       }
       else if (block.type === 'heading') {
-        // 处理标题块 - 这是缺失的关键部分！
+        // 处理标题块 - 标题保持自己的样式，不受对齐块影响
         const { level, content: headingText, alignment } = block;
         
         console.log(`PDF处理标题块: 级别=${level}, 内容="${headingText}", 对齐=${alignment}`);
@@ -889,13 +902,13 @@ export const generateAdvancedPdf = async (content, config, resumeData) => {
           headingStyle = styleConfig.h3;
         }
         
-        // 创建标题元素
+        // 创建标题元素 - 标题默认左对齐，对齐块不影响标题的字体样式
         const headingElement = {
           type: 'heading',
           level: level,
           text: headingText,
           style: headingStyle,
-          alignment: alignment ? getAlignmentType(alignment) : 'left'
+          alignment: 'left' // 标题默认左对齐，保持自己的样式规范
         };
         
         // 渲染标题元素
@@ -951,7 +964,7 @@ export const generateSimplePdfV2 = generateAdvancedPdf;
 // 添加字体测试函数
 export const testFontInPdf = async () => {
   try {
-    // 创建一个简单的测试内容，避免复杂的嵌套格式
+    // 创建一个包含居中对齐的测试内容
     const testContent = `# 个人简历
 
 ## EDUCATION
@@ -962,6 +975,12 @@ BSc Applied Mathematics
 ::: right
 Suzhou, China
 Sep 2019 - Jun 2023
+:::
+
+## EXPERIENCE
+::: solocenter
+- Developed and tracked critical product metrics, conducting root cause analysis of performance variations to enhance product optimization.
+- Assisted in buil*ding int*ernal databases, performing data mining and evaluation, and maintaining data models
 :::
 
 ## SKILLS
@@ -978,11 +997,11 @@ Sep 2019 - Jun 2023
       font: 'SimSun',
       fontSize: 12,
       lineHeight: 1.5
-    }, { user_name: '简单测试' });
+    }, { user_name: '居中对齐测试' });
 
     return {
       success: true,
-      message: 'PDF简单测试成功！',
+      message: 'PDF居中对齐测试成功！',
       details: {
         font: 'SimSun',
         fontSize: 12,
@@ -990,11 +1009,12 @@ Sep 2019 - Jun 2023
         contentLength: testContent.length,
         hasHeadings: true,
         hasLists: true,
-        hasH2Underline: true
+        hasH2Underline: true,
+        hasCenterAlignment: true
       }
     };
   } catch (error) {
-    console.error('PDF简单测试失败:', error);
+    console.error('PDF居中对齐测试失败:', error);
     return {
       success: false,
       error: error.message,

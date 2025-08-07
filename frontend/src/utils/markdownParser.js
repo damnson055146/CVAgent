@@ -105,23 +105,23 @@ export function parseCustomBlocks(md) {
         });
         console.log(`${alignType} 块包含嵌套内容，递归解析结果:`, nestedParsed.length, '个子块');
       } else {
-        // 对于solo类型，保持原始内容格式，不合并成字符串
-        // 这样可以保留Markdown格式如标题和粗体
+        // 对于solo类型，保持原始内容格式，让标题保持自己的样式
+        // 对齐标识符只影响对齐方式，不影响标题的字体大小和样式
         if (content.length === 1) {
           // 单行内容，直接使用
           blocks.push({ 
             type: alignType, 
             content: content[0],
             hasNested: false,
-            alignment: alignType // 添加对齐属性
+            alignment: alignType
           });
         } else {
-          // 多行内容，保持数组格式以便后续处理
+          // 多行内容，保持数组格式
           blocks.push({ 
             type: alignType, 
             content: content,
             hasNested: false,
-            alignment: alignType // 添加对齐属性
+            alignment: alignType
           });
         }
       }
@@ -140,7 +140,7 @@ export function parseCustomBlocks(md) {
         type: 'heading', 
         level: level,
         content: headingText,
-        alignment: 'left' // 默认左对齐
+        alignment: 'left' // 默认左对齐，但可以在对齐块中被覆盖
       });
     } else {
       blocks.push({ type: 'normal', content: line, alignment: 'left' });

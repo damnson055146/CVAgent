@@ -29,8 +29,8 @@ import {
 
 
 
-// 安全的Markdown组件 - 参考RenderPreview (1).jsx的用法
-const SafeMarkdown = ({ children }) => {
+// 安全的Markdown组件 - 支持对齐块内的标题渲染
+const SafeMarkdown = ({ children, alignment = 'left' }) => {
   try {
     // 确保children是字符串
     const content = typeof children === 'string' ? children : String(children || '');
@@ -40,8 +40,37 @@ const SafeMarkdown = ({ children }) => {
       return <div></div>;
     }
     
+    // 自定义组件，处理标题的对齐
+    const components = {
+      h1: ({ children }) => (
+        <h1 className="text-3xl font-bold mb-4" style={{ textAlign: alignment }}>
+          {children}
+        </h1>
+      ),
+      h2: ({ children }) => (
+        <h2 className="text-2xl font-semibold mb-3 pb-1 border-b border-gray-500" style={{ textAlign: alignment }}>
+          {children}
+        </h2>
+      ),
+      h3: ({ children }) => (
+        <h3 className="text-xl font-medium mb-2 text-blue-600" style={{ textAlign: alignment }}>
+          {children}
+        </h3>
+      ),
+      p: ({ children }) => (
+        <p className="mb-2" style={{ textAlign: alignment }}>
+          {children}
+        </p>
+      ),
+      li: ({ children }) => (
+        <li className="mb-1" style={{ textAlign: alignment }}>
+          {children}
+        </li>
+      )
+    };
+    
     return (
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
     );
@@ -69,10 +98,10 @@ function CustomMarkdownPage({ blocks }) {
         return (
           <div key={key} className="flex justify-between mb-2">
             <div className="text-left flex-1">
-              <SafeMarkdown>{block.left || ''}</SafeMarkdown>
+              <SafeMarkdown alignment="left">{block.left || ''}</SafeMarkdown>
             </div>
             <div className="text-right flex-1">
-              <SafeMarkdown>{block.right || ''}</SafeMarkdown>
+              <SafeMarkdown alignment="right">{block.right || ''}</SafeMarkdown>
             </div>
           </div>
         );
@@ -80,13 +109,21 @@ function CustomMarkdownPage({ blocks }) {
       case 'heading':
         const level = block.level || 1;
         const headingTag = `h${level}`;
-        const headingClass = level === 1 ? 'text-3xl font-bold mb-4' : 
-                           level === 2 ? 'text-2xl font-semibold mb-3 border-b border-gray-300 pb-1' :
-                           'text-xl font-medium mb-2';
         
+        // 标题样式遵循H1/H2/H3自己的规范，不受对齐块影响
+        let headingClass = '';
+        if (level === 1) {
+          headingClass = 'text-3xl font-bold mb-4'; // H1: 22pt, 粗体, 下边距6mm
+        } else if (level === 2) {
+          headingClass = 'text-2xl font-semibold mb-3 pb-1 border-b border-gray-500'; // H2: 16pt, 粗体, 下划线, 下边距4mm
+        } else {
+          headingClass = 'text-xl font-medium mb-2 text-blue-600'; // H3: 12pt, 粗体, 蓝色, 下边距3mm
+        }
+        
+        // 标题默认左对齐，对齐块不影响标题的字体样式
         return (
           <div key={key} className={headingClass}>
-            <SafeMarkdown>{block.content || ''}</SafeMarkdown>
+            <SafeMarkdown alignment="left">{block.content || ''}</SafeMarkdown>
           </div>
         );
         
@@ -101,7 +138,7 @@ function CustomMarkdownPage({ blocks }) {
                 )}
               </div>
             ) : (
-              <SafeMarkdown>{block.content || ''}</SafeMarkdown>
+              <SafeMarkdown alignment="left">{block.content || ''}</SafeMarkdown>
             )}
           </div>
         );
@@ -117,7 +154,7 @@ function CustomMarkdownPage({ blocks }) {
                 )}
               </div>
             ) : (
-              <SafeMarkdown>{block.content || ''}</SafeMarkdown>
+              <SafeMarkdown alignment="right">{block.content || ''}</SafeMarkdown>
             )}
           </div>
         );
@@ -133,7 +170,7 @@ function CustomMarkdownPage({ blocks }) {
                 )}
               </div>
             ) : (
-              <SafeMarkdown>{block.content || ''}</SafeMarkdown>
+              <SafeMarkdown alignment="center">{block.content || ''}</SafeMarkdown>
             )}
           </div>
         );
@@ -142,7 +179,7 @@ function CustomMarkdownPage({ blocks }) {
       default:
         return (
           <div key={key} className="mb-2">
-            <SafeMarkdown>{block.content || ''}</SafeMarkdown>
+            <SafeMarkdown alignment="left">{block.content || ''}</SafeMarkdown>
           </div>
         );
     }
