@@ -77,6 +77,19 @@ function CustomMarkdownPage({ blocks }) {
           </div>
         );
         
+      case 'heading':
+        const level = block.level || 1;
+        const headingTag = `h${level}`;
+        const headingClass = level === 1 ? 'text-3xl font-bold mb-4' : 
+                           level === 2 ? 'text-2xl font-semibold mb-3 border-b border-gray-300 pb-1' :
+                           'text-xl font-medium mb-2';
+        
+        return (
+          <div key={key} className={headingClass}>
+            <SafeMarkdown>{block.content || ''}</SafeMarkdown>
+          </div>
+        );
+        
       case 'left':
       case 'sololeft':
         return (
@@ -324,31 +337,43 @@ const RenderPreview = forwardRef(({
         .resume-page .prose * {
           color: inherit !important;
         }
-        .resume-page .prose h1 {
-          font-size: calc(1.833 * ${config.fontSize}pt);
-          font-weight: bold;
-          color: rgb(0, 0, 0);
-          margin-bottom: 1.2rem;
-          padding-bottom: 0.5rem;
-          letter-spacing: 1px;
+        
+        /* H1样式 - 匹配Word和PDF配置 */
+        .resume-page .prose h1,
+        .resume-page .text-3xl {
+          font-size: calc(1.833 * ${config.fontSize}pt) !important;
+          font-weight: bold !important;
+          color: rgb(0, 0, 0) !important;
+          margin-bottom: 1.2rem !important;
+          margin-top: 0.6rem !important;
+          line-height: 1.2 !important;
+          letter-spacing: 0.5px !important;
         }
-        .resume-page .prose h2 {
-          font-size: calc(1.25 * ${config.fontSize}pt);
-          color: #0e2954;
-          margin-top: 1.5rem;
-          margin-bottom: 1rem;
-          font-weight: 600;
-          border-bottom: 1px solid rgb(73, 73, 73);
-          padding-left: 0.6rem;
-          padding-bottom: 0.5rem;
+        
+        /* H2样式 - 匹配Word和PDF配置 */
+        .resume-page .prose h2,
+        .resume-page .text-2xl {
+          font-size: calc(1.25 * ${config.fontSize}pt) !important;
+          font-weight: bold !important;
+          color: rgb(0, 0, 0) !important;
+          margin-top: 1.5rem !important;
+          margin-bottom: 1rem !important;
+          border-bottom: 1px solid rgb(73, 73, 73) !important;
+          padding-bottom: 0.5rem !important;
+          line-height: 1.3 !important;
         }
-        .resume-page .prose h3 {
-          font-size: calc(0.958 * ${config.fontSize}pt);
-          color: #2563eb;
-          margin-top: 1rem;
-          margin-bottom: 0.5rem;
-          font-weight: 500;
+        
+        /* H3样式 - 匹配Word和PDF配置 */
+        .resume-page .prose h3,
+        .resume-page .text-xl {
+          font-size: calc(1.0 * ${config.fontSize}pt) !important;
+          font-weight: bold !important;
+          color: #2563eb !important;
+          margin-top: 1rem !important;
+          margin-bottom: 0.5rem !important;
+          line-height: 1.4 !important;
         }
+        
         .resume-page .prose strong {
           color: #22223b;
           font-weight: bold;

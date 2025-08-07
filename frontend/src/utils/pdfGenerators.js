@@ -17,20 +17,20 @@ const PDF_STYLE_CONFIG = {
     
     // 标题样式配置 - 完全匹配Word样式
     h1: {
-      fontSize: 44, // 与Word保持一致：44pt
+      fontSize: 22, // 与Word保持一致：44pt/2 (PDF单位是pt，Word是半点)
       color: [0, 0, 0], // 黑色
       bold: true,
       spacing: { after: 8, before: 4 },
     },
     h2: {
-      fontSize: 32, // 与Word保持一致：32pt
+      fontSize: 16, // 与Word保持一致：32pt/2
       color: [0, 0, 0], // 黑色
       bold: true,
       spacing: { after: 5, before: 2 },
       border: { bottom: { style: 'solid', width: 0.3, color: [73, 73, 73] } },
     },
     h3: {
-      fontSize: 24, // 与Word保持一致：24pt
+      fontSize: 12, // 与Word保持一致：24pt/2
       color: [37, 99, 235], // #2563eb 蓝色
       bold: true,
       spacing: { after: 5, before: 4 },
@@ -38,7 +38,7 @@ const PDF_STYLE_CONFIG = {
     
     // 文本样式 - 匹配Word样式
     paragraph: {
-      fontSize: 24, // 与Word保持一致：24pt
+      fontSize: 12, // 与Word保持一致：24pt/2
       color: [0, 0, 0],
       spacing: { after: 4 },
       lineHeight: 1.4,
@@ -46,7 +46,7 @@ const PDF_STYLE_CONFIG = {
     
     // 列表样式 - 匹配Word样式
     list: {
-      fontSize: 24, // 与Word保持一致：24pt
+      fontSize: 12, // 与Word保持一致：24pt/2
       color: [0, 0, 0],
       spacing: { after: 3 },
       indent: { left: 5 }, // 缩进 in mm
@@ -74,9 +74,9 @@ const generatePdfStyleConfig = (config) => {
   const baseFontSize = config.fontSize || 12;
   const baseLineHeight = config.lineHeight || 1.5;
   
-  const h1Ratio = 1.833; // 44/24
-  const h2Ratio = 1.25;  // 30/24
-  const h3Ratio = 1.0;   // 24/24
+  const h1Ratio = 1.833; // 22/12
+  const h2Ratio = 1.333; // 16/12
+  const h3Ratio = 1.0;   // 12/12
   
   const spacingRatio = (baseFontSize / 12) * 0.7;
   
@@ -116,7 +116,6 @@ const generatePdfStyleConfig = (config) => {
     paragraph: {
       ...baseStyleConfig.paragraph,
       fontSize: baseFontSize,
-      lineHeight: baseLineHeight,
       spacing: {
         after: Math.round(baseStyleConfig.paragraph.spacing.after * spacingRatio)
       }
@@ -124,7 +123,6 @@ const generatePdfStyleConfig = (config) => {
     list: {
       ...baseStyleConfig.list,
       fontSize: baseFontSize,
-      lineHeight: baseLineHeight,
       spacing: {
         after: Math.round(baseStyleConfig.list.spacing.after * spacingRatio)
       },
