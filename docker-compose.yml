@@ -1,7 +1,6 @@
 version: "3.8"
 
 services:
-  # PostgreSQL数据库
   postgres:
     image: postgres:15
     environment:
@@ -12,7 +11,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./config/sql_postgre:/docker-entrypoint-initdb.d
+      - ./backend/config/sql_postgre:/docker-entrypoint-initdb.d
     networks:
       - cv-agent-network
     restart: unless-stopped
@@ -22,13 +21,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # 后端服务
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    env_file:
-      - .env
     environment:
       # Database
       DATABASE_URL: postgresql+psycopg2://postgres:13689282250@postgres:5432/aiagent
@@ -39,10 +35,10 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 1440
       REFRESH_TOKEN_EXPIRE_DAYS: 7
       LOG_LEVEL: INFO
-      ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175
+      ORIGINS: http://localhost:80,http://127.0.0.1:80
 
-      # SiliconFlow keys & limits
-      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
+      # SiliconFlow keys & limits (从宿主 .env 读取或使用默认)
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY}
       SILICONFLOW_API_KEY_2: ${SILICONFLOW_API_KEY_2:-}
       SILICONFLOW_KEY1_RPM: ${SILICONFLOW_KEY1_RPM:-60}
       SILICONFLOW_KEY1_TPM: ${SILICONFLOW_KEY1_TPM:-90000}
@@ -55,13 +51,12 @@ services:
       SILICONFLOW_CIRCUIT_BREAK_SECONDS: ${SILICONFLOW_CIRCUIT_BREAK_SECONDS:-60}
       SILICONFLOW_MODEL: ${SILICONFLOW_MODEL:-deepseek-ai/DeepSeek-V3}
       SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL:-https://api.siliconflow.cn/v1}
-    ports:
-      - "8699:8699"
     volumes:
-      - ./app:/app/app
-      - ./main.py:/app/main.py
-      - ./requirements.txt:/app/requirements.txt
-      - ./wait-for-db.sh:/app/wait-for-db.sh
+      - ./backend/app:/app/app
+      - ./backend/main.py:/app/main.py
+      - ./backend/requirements.txt:/app/requirements.txt
+      - ./backend/env.example:/app/.env
+      - ./backend/wait-for-db.sh:/app/wait-for-db.sh
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,21 +69,28 @@ services:
       timeout: 10s
       retries: 3
 
-  # 前端服务 - 暂时注释掉
-  # frontend:
-  #   build:
-  #     context: ../frontend
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     VITE_API_BASE_URL: http://localhost:8700
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     backend:
-  #       condition: service_healthy
-  #   networks:
-  #     - cv-agent-network
-  #   restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    networks:
+      - cv-agent-network
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: ./Nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - cv-agent-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:

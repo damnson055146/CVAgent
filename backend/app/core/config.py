@@ -29,6 +29,7 @@ class Settings(BaseModel):
         'personal_statement': os.getenv("DIFY_API_KEY_PERSONAL_STATEMENT"),
         'recommendation': os.getenv("DIFY_API_KEY_RECOMMENDATION"),
         'prompt_based': os.getenv("DIFY_API_KEY_PROMPT_BASED"),  # 新增
+        'naming': os.getenv("DIFY_API_KEY_NAMING"),
     }
 
     # 校验所有必要环境变量是否已设置
