@@ -7,6 +7,7 @@ CREATE TABLE document_versions (
     version_number   INTEGER NOT NULL,
     content          TEXT   NOT NULL,           
     content_format   TEXT   NOT NULL DEFAULT 'markdown' CHECK (content_format IN ('markdown','html','plain')),
+    user_profile     TEXT,
     diff_from        UUID REFERENCES document_versions(id),  
     checksum_sha256  TEXT,                        
     created_by       UUID REFERENCES users(id),

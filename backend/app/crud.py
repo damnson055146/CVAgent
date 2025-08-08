@@ -47,6 +47,7 @@ def save_document(
         document_id=doc.id,
         version_number=next_ver,
         content=payload.content_md,
+        user_profile=payload.user_profile,
         created_by=payload.user_id
     )
     db.add(ver)
@@ -108,6 +109,7 @@ def save_document_by_id(
         document_id=doc.id,
         version_number=next_ver,
         content=payload.content_md,
+        user_profile=payload.user_profile,
         created_by=payload.user_id
     )
     db.add(ver)

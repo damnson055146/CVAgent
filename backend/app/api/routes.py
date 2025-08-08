@@ -1,14 +1,19 @@
 import json
 import fitz # PyMuPDF
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.responses import Response, JSONResponse
 from fastapi.concurrency import run_in_threadpool
 from typing import Dict, Any
 from datetime import datetime
 import uuid
 
-from app.models.schemas import TextInput, NewResumeProfile, PromptTextInput
-from app.services.dify_client import dify_client
+from app.models.schemas import TextInput, NewResumeProfile, PromptTextInput, ModelChoice, JsonInputWithModel
+from app.models import user_models
+from app.services import siliconflow_client as sf_client
+from app.models.api_log_models import APILog
+from app.database import get_db
+from sqlalchemy.orm import Session
+from uuid import UUID
 
 # 本地缓存存储
 local_cache = {}
@@ -16,8 +21,24 @@ local_cache = {}
 router = APIRouter()
 
 
+def _ensure_user_exists(db: Session, user_id: UUID) -> None:
+    user = db.query(user_models.User).filter(
+        user_models.User.id == user_id,
+        user_models.User.deleted_at.is_(None),
+        user_models.User.is_active.is_(True),
+    ).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or inactive user_id")
+
+
 @router.post("/parse-resume/")
-async def parse_resume(file: UploadFile = File(...)):
+async def parse_resume(
+    file: UploadFile = File(...),
+    model: ModelChoice = ModelChoice.deepseek_v3,
+    user_id: UUID = Form(...),
+    db: Session = Depends(get_db),
+):
+    _ensure_user_exists(db, user_id)
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="无效的文件类型，请上传PDF。")
     try:
@@ -26,177 +47,247 @@ async def parse_resume(file: UploadFile = File(...)):
         if not extracted_text.strip():
             raise ValueError("无法从PDF中提取任何文本。")
 
-        result = await run_in_threadpool(dify_client.parse_text, extracted_text)
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._PARSE_RESUME_PROMPT, extracted_text, model.value, True)
+        result = content
         if "error" in result:
             raise HTTPException(status_code=502, detail=result["error"])
+        # log
+        log = APILog(
+            user_id=user_id,
+            api_name="parse_resume",
+            request_payload={"filename": file.filename, "model": model.value, "user_id": str(user_id)},
+            system_prompt=meta.get("system_prompt"),
+            model=meta.get("model"),
+            prompt_tokens=meta.get("prompt_tokens"),
+            completion_tokens=meta.get("completion_tokens"),
+            total_tokens=meta.get("total_tokens"),
+            response_text=json.dumps(result, ensure_ascii=False)
+        )
+        db.add(log)
+        db.commit()
         return JSONResponse(content=result)
     except Exception as e:
+        try:
+            db.add(APILog(
+                user_id=user_id if 'user_id' in locals() else None,
+                api_name="parse_resume",
+                request_payload={"filename": getattr(file, 'filename', None), "model": getattr(model, 'value', None), "user_id": str(user_id) if 'user_id' in locals() else None},
+                error=str(e)
+            ))
+            db.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/parse-resume-text/")
-async def parse_resume_text(input_data: TextInput):
-    result = await run_in_threadpool(dify_client.parse_text, input_data.text)
+async def parse_resume_text(input_data: TextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._PARSE_RESUME_PROMPT, input_data.text, input_data.model.value, True)
+    result = content
     if "error" in result:
-        raise HTTPException(status_code=502, detail=result["error"])
+        raise HTTPException(status_code=502, detail=result)
+    log = APILog(
+        user_id=input_data.user_id,
+        api_name="parse_resume_text",
+        request_payload={"body": input_data.model_dump(mode="json")},
+        system_prompt=meta.get("system_prompt"),
+        model=meta.get("model"),
+        prompt_tokens=meta.get("prompt_tokens"),
+        completion_tokens=meta.get("completion_tokens"),
+        total_tokens=meta.get("total_tokens"),
+        response_text=json.dumps(result, ensure_ascii=False)
+    )
+    db.add(log)
+    db.commit()
     return JSONResponse(content=result)
 
 
 @router.post("/optimize-text/")
-async def rewrite_text(input_data: TextInput):
-    result = await run_in_threadpool(dify_client.rewrite_text, input_data.text)
-    return JSONResponse(content={"rewritten_text": result})
+async def rewrite_text(input_data: TextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._REWRITE_TEXT_PROMPT, input_data.text, input_data.model.value, False)
+    db.add(APILog(
+        user_id=input_data.user_id,
+        api_name="optimize_text",
+        request_payload={"body": input_data.model_dump(mode="json")},
+        system_prompt=meta.get("system_prompt"),
+        model=meta.get("model"),
+        prompt_tokens=meta.get("prompt_tokens"),
+        completion_tokens=meta.get("completion_tokens"),
+        total_tokens=meta.get("total_tokens"),
+        response_text=str(content) if isinstance(content, str) else None
+    ))
+    db.commit()
+    return JSONResponse(content={"rewritten_text": content})
 
 
 @router.post("/expand-text/")
-async def expand_text(input_data: TextInput):
-    result = await run_in_threadpool(dify_client.expand_text, input_data.text)
-    return JSONResponse(content={"expanded_text": result})
+async def expand_text(input_data: TextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._EXPAND_TEXT_PROMPT, input_data.text, input_data.model.value, False)
+    db.add(APILog(
+        user_id=input_data.user_id,
+        api_name="expand_text",
+        request_payload={"body": input_data.model_dump(mode="json")},
+        system_prompt=meta.get("system_prompt"),
+        model=meta.get("model"),
+        prompt_tokens=meta.get("prompt_tokens"),
+        completion_tokens=meta.get("completion_tokens"),
+        total_tokens=meta.get("total_tokens"),
+        response_text=str(content) if isinstance(content, str) else None
+    ))
+    db.commit()
+    return JSONResponse(content={"expanded_text": content})
 
 
 @router.post("/contract-text/")
-async def contract_text(input_data: TextInput):
-    result = await run_in_threadpool(dify_client.contract_text, input_data.text)
-    return JSONResponse(content={"contracted_text": result})
+async def contract_text(input_data: TextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._CONTRACT_TEXT_PROMPT, input_data.text, input_data.model.value, False)
+    db.add(APILog(
+        user_id=input_data.user_id,
+        api_name="contract_text",
+        request_payload={"body": input_data.model_dump(mode="json")},
+        system_prompt=meta.get("system_prompt"),
+        model=meta.get("model"),
+        prompt_tokens=meta.get("prompt_tokens"),
+        completion_tokens=meta.get("completion_tokens"),
+        total_tokens=meta.get("total_tokens"),
+        response_text=str(content) if isinstance(content, str) else None
+    ))
+    db.commit()
+    return JSONResponse(content={"contracted_text": content})
 
 
 @router.post("/evaluate-resume/")
-async def process_json_to_text(input_data: Dict[str, Any]):
-    json_as_text = json.dumps(input_data, indent=2, ensure_ascii=False)
-    result = await run_in_threadpool(dify_client.process_json_as_text, json_as_text)
-    return JSONResponse(content={"processed_text": result})
+async def process_json_to_text(input_data: JsonInputWithModel, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
+    json_as_text = json.dumps(input_data.data, indent=2, ensure_ascii=False)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._EVALUATE_RESUME_PROMPT, json_as_text, input_data.model.value, False)
+    db.add(APILog(
+        user_id=input_data.user_id,
+        api_name="evaluate_resume",
+        request_payload={"body": input_data.model_dump(mode="json")},
+        system_prompt=meta.get("system_prompt"),
+        model=meta.get("model"),
+        prompt_tokens=meta.get("prompt_tokens"),
+        completion_tokens=meta.get("completion_tokens"),
+        total_tokens=meta.get("total_tokens"),
+        response_text=str(content) if isinstance(content, str) else None
+    ))
+    db.commit()
+    return JSONResponse(content={"processed_text": content})
 
 
 @router.post("/modified-text-prompt/")
-async def generate_with_prompt(input_data: PromptTextInput):
+async def generate_with_prompt(input_data: PromptTextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
     """
-    接收文本和自定义提示，调用Dify生成文本，并以指定格式返回。
+    接收文本和自定义提示，调用SiliconFlow生成文本，并以指定格式返回。
     """
     try:
-        generated_text = await run_in_threadpool(
-            dify_client.generate_with_prompt,
-            text=input_data.text,
-            prompt=input_data.prompt
-        )
-        return JSONResponse(content={"modified_text": generated_text})
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, input_data.prompt, input_data.text, input_data.model.value, False)
+        db.add(APILog(
+            user_id=input_data.user_id,
+            api_name="modified_text_prompt",
+            request_payload={"body": input_data.model_dump(mode="json")},
+            system_prompt=meta.get("system_prompt"),
+            model=meta.get("model"),
+            prompt_tokens=meta.get("prompt_tokens"),
+            completion_tokens=meta.get("completion_tokens"),
+            total_tokens=meta.get("total_tokens"),
+            response_text=str(content) if isinstance(content, str) else None
+        ))
+        db.commit()
+        return JSONResponse(content={"modified_text": content})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"生成文本时发生内部错误: {e}")
 
 
-@router.post("/generate_statement/")
-async def generate_statement(input_data: TextInput):
+@router.post("/generate-statement/")
+async def generate_statement(input_data: TextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
     """
-    接收包含个人陈述相关信息的文本，调用 Dify 生成个人陈述。
+    接收包含个人陈述相关信息的文本，调用 SiliconFlow 生成个人陈述。
     """
     try:
-        # dify_client.generate_statement 返回一个 JSON 格式的字符串
-        statement_text = await run_in_threadpool(dify_client.generate_statement,input_data.text)
-
-        # 1. 清理可能存在的 ```json ``` 包裹（如果有）
-        clean = statement_text
-        if clean.startswith("```"):
-            clean = clean.strip("`").strip("json").strip()
-
-        # 2. 把 JSON 字符串转成 dict
-        statement_dict = json.loads(clean)
-
-        # 3. 直接返回 dict，FastAPI 会自动序列化为 JSON
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._GENERATE_STATEMENT_PROMPT, input_data.text, input_data.model.value, True)
+        statement_dict = content
+        if "error" in statement_dict:
+            raise HTTPException(status_code=502, detail=statement_dict["error"])
+        db.add(APILog(
+            user_id=input_data.user_id,
+            api_name="generate_statement",
+            request_payload={"body": input_data.model_dump(mode="json")},
+            system_prompt=meta.get("system_prompt"),
+            model=meta.get("model"),
+            prompt_tokens=meta.get("prompt_tokens"),
+            completion_tokens=meta.get("completion_tokens"),
+            total_tokens=meta.get("total_tokens"),
+            response_text=json.dumps(statement_dict, ensure_ascii=False)
+        ))
+        db.commit()
         return statement_dict
-        # return {"personal_statement": statement_dict}    #包在一个字段里返回
-
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail="生成的个人陈述不是有效的 JSON，解析失败"
-        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"生成个人陈述时发生内部错误: {e}"
         )
 
-@router.post("/generate_recommendation/")
-async def generate_recommendation(input_data: TextInput):
+@router.post("/generate-recommendation/")
+async def generate_recommendation(input_data: TextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
     """
     接收生成推荐信所需的信息文本，调用Dify并返回其生成的JSON结构。
     """
     try:
-        recommendation_json = await run_in_threadpool(dify_client.generate_recommendation, input_data.text)
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._GENERATE_RECOMMENDATION_PROMPT, input_data.text, input_data.model.value, True)
+        recommendation_json = content
         if "error" in recommendation_json:
             raise HTTPException(status_code=502, detail=recommendation_json["error"])
+        db.add(APILog(
+            user_id=input_data.user_id,
+            api_name="generate_recommendation",
+            request_payload={"body": input_data.model_dump(mode="json")},
+            system_prompt=meta.get("system_prompt"),
+            model=meta.get("model"),
+            prompt_tokens=meta.get("prompt_tokens"),
+            completion_tokens=meta.get("completion_tokens"),
+            total_tokens=meta.get("total_tokens"),
+            response_text=json.dumps(recommendation_json, ensure_ascii=False)
+        ))
+        db.commit()
         return JSONResponse(content=recommendation_json)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"生成推荐信时发生内部错误: {e}")
 
 
-@router.post("/name-document/")
-async def name_document(input_data: TextInput):
+@router.post("/user-profile/")
+async def name_document(input_data: TextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
     """
     接收Markdown格式的文本，调用Dify为其生成一个合适的标题。
     """
     try:
-        document_name = await run_in_threadpool(dify_client.name_document, input_data.text)
-        return JSONResponse(content={"document_name": document_name})
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._NAME_DOCUMENT_PROMPT, input_data.text, input_data.model.value, False)
+        db.add(APILog(
+            user_id=input_data.user_id,
+            api_name="name_document",
+            request_payload={"body": input_data.model_dump(mode="json")},
+            system_prompt=meta.get("system_prompt"),
+            model=meta.get("model"),
+            prompt_tokens=meta.get("prompt_tokens"),
+            completion_tokens=meta.get("completion_tokens"),
+            total_tokens=meta.get("total_tokens"),
+            response_text=str(content) if isinstance(content, str) else None
+        ))
+        db.commit()
+        return JSONResponse(content={"document_name": content})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"为文档命名时发生内部错误: {e}")
 
 
-# 本地缓存API
-@router.post("/api/documents_save/{doc_type}")
-async def save_document_endpoint(doc_type: str, payload: Dict[str, Any]):
-    """
-    保存文档到本地缓存
-    """
-    # 硬编码UID
-    user_id = "550e8400-e29b-41d4-a716-446655440000"
-    
-    doc_id = str(uuid.uuid4())
-    version_id = str(uuid.uuid4())
-    
-    # 保存到本地缓存
-    local_cache[doc_id] = {
-        "id": doc_id,
-        "user_id": user_id,
-        "type": doc_type,
-        "current_version_id": version_id,
-        "content_md": payload.get("content_md", ""),
-        "created_at": datetime.now().isoformat(),
-        "updated_at": datetime.now().isoformat(),
-        "version_id": version_id
-    }
-    
-    return {
-        "id": doc_id,
-        "user_id": user_id,
-        "type": doc_type,
-        "current_version_id": version_id,
-        "content_md": payload.get("content_md", ""),
-        "created_at": local_cache[doc_id]["created_at"],
-        "updated_at": local_cache[doc_id]["updated_at"],
-    }
 
-
-@router.post("/api/documents/{doc_type}")
-async def get_current_document(doc_type: str, payload: Dict[str, Any]):
-    """
-    从本地缓存获取文档
-    """
-    # 硬编码UID
-    user_id = "550e8400-e29b-41d4-a716-446655440000"
-    
-    # 查找用户的文档
-    for doc_id, doc_data in local_cache.items():
-        if doc_data["user_id"] == user_id and doc_data["type"] == doc_type:
-            return {
-                "id": doc_data["id"],
-                "user_id": doc_data["user_id"],
-                "type": doc_data["type"],
-                "current_version_id": doc_data["current_version_id"],
-                "content_md": doc_data["content_md"],
-                "created_at": doc_data["created_at"],
-                "updated_at": doc_data["updated_at"],
-            }
-    
-    raise HTTPException(404, "Document not found")
 
 

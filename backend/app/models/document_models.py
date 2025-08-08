@@ -40,6 +40,7 @@ class DocumentVersion(Base):
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     version_number = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
+    user_profile = Column(Text, nullable=True)  # 新增：用于保存生成该版本时的用户profile
     content_format = Column(ENUM(ContentFormat), nullable=False, default=ContentFormat.markdown)
     diff_from = Column(UUID(as_uuid=True), ForeignKey("document_versions.id"), nullable=True)
     checksum_sha256 = Column(String, nullable=True)

@@ -11,8 +11,9 @@ from dotenv import load_dotenv
 
 from app.api.routes import router
 from app.api.auth_routes import router as auth_router
-from app.api.document_routes import router as document_router
+# from app.api.document_routes import router as document_router
 from app.models import user_models, document_models
+from app.models.api_log_models import APILog
 from app.database import get_db, Base, engine,SessionLocal
 from app.models import schemas
 from app import crud # <--- 导入新的 crud 模块
@@ -36,12 +37,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost:80",
-        "http://127.0.0.1:80",
-        "http://localhost",
-        "http://127.0.0.1",
-        "*"  # 开发环境允许所有来源
+        "http://127.0.0.1:5174"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -49,15 +45,14 @@ app.add_middleware(
 )
 
 # 包含路由
-# Expose endpoints both with and without the /api prefix so that nginx/dev setups that strip the prefix continue to work.
-app.include_router(router, prefix="/api")
-app.include_router(router)  # no prefix
+app.include_router(router)
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(document_router, prefix="/documents", tags=["documents"])
+# app.include_router(document_router, prefix="/documents", tags=["documents"])
 
 # 创建数据库表
 user_models.Base.metadata.create_all(bind=engine)
 document_models.Base.metadata.create_all(bind=engine)
+APILog.metadata.create_all(bind=engine)
 
 @app.get("/")
 async def root():
@@ -69,7 +64,7 @@ async def health_check():
     return {"status": "healthy", "service": "CV Agent API"}
 
 
-#创建文档api
+#按类型创建文档
 @app.post(
     "/api/documents/{doc_type}/create",
     response_model=schemas.DocumentWithContent,
@@ -100,7 +95,7 @@ def create_document_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
+#删除文档
 @app.delete(
     "/api/documents/{doc_id}/delete",
     status_code=204,
@@ -149,7 +144,7 @@ def delete_document(
     db.commit()
     return
 
-
+#按类型获取文档列表
 @app.post(
     "/api/documents/{doc_type}/history",
     response_model=List[schemas.DocumentListItem],
@@ -185,7 +180,7 @@ def get_user_documents_by_type(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-#上传文件api
+#上传文档保存至最新版本
 @app.post(
   "/api/versions/{doc_id}/save",
   response_model=schemas.DocumentWithContent,
@@ -220,7 +215,7 @@ def save_document_endpoint(
         else:
             raise HTTPException(status_code=404, detail=str(e))
 
-
+#按文档获取版本列表
 @app.post(
     "/api/versions/{doc_id}/history",
     response_model=List[schemas.DocumentVersionHistoryItem],
@@ -258,7 +253,47 @@ def get_document_history(
             raise HTTPException(status_code=404, detail=str(e))
 
 
+#按版本添加用户画像
+@app.post(
+    "/api/versions/{doc_id}/user_profile_save",
+    status_code=200,
+    tags=["版本 (Versions)"]
+)
+def save_user_profile_to_version(
+        doc_id: uuid.UUID = Path(..., description="目标版本ID (document_versions.id)"),
+        payload: dict = Body(..., example={"user_id": "<uuid>", "user_profile": "xxx"}),
+        db: Session = Depends(get_db)
+):
+    """根据版本ID保存/更新 user_profile 字段。
 
+    权限校验：payload.user_id 必须与 version.document.user_id 一致。
+    """
+    from sqlalchemy.orm import joinedload
+    # 查找版本并关联父文档
+    version = db.query(document_models.DocumentVersion).options(
+        joinedload(document_models.DocumentVersion.document)
+    ).filter(document_models.DocumentVersion.id == doc_id).first()
+
+    if not version:
+        raise HTTPException(status_code=404, detail="未找到该版本")
+
+    # 检查版本是否被软删除
+    if version.deleted_at is not None:
+        raise HTTPException(status_code=410, detail="该版本已被删除")
+
+    # 校验用户
+    if str(version.document.user_id) != str(payload.get("user_id")):
+        raise HTTPException(status_code=403, detail="无权操作：您没有权限修改此版本的用户画像")
+
+    # 更新 user_profile
+    version.user_profile = payload.get("user_profile", "")
+    db.add(version)
+    db.commit()
+    db.refresh(version)
+
+    return {"version_id": str(version.id), "user_profile": version.user_profile}
+
+#按版本获取内容
 @app.post(
     "/api/versions/{version_id}/content",
     response_model=schemas.DocumentVersionContent,
@@ -295,7 +330,7 @@ def get_version_content(
     
     return version
 
-
+#按版本删除
 @app.delete(
     "/api/versions/{version_id}/delete",
     status_code=204,

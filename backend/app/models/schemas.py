@@ -7,12 +7,6 @@ from uuid import UUID
 from enum import Enum
 
 
-
-
-
-
-
-
 # --- 认证相关模型 ---
 class UserCreate(BaseModel):
     username: Optional[str] = None
@@ -46,13 +40,28 @@ class UserInDB(BaseModel):
         from_attributes = True
 
 # --- 通用输入模型 ---
+class ModelChoice(str, Enum):
+    deepseek_v3 = "deepseek-ai/DeepSeek-V3"
+    qwen_7b = "Qwen/Qwen2.5-7B-Instruct"
+    glm4_9b = "THUDM/glm-4-9b-chat"
+
 class TextInput(BaseModel):
+    user_id: UUID
     text: str = Field(..., min_length=1)
+    model: ModelChoice = Field(ModelChoice.deepseek_v3, description="要使用的模型标识")
 
 # 新增：用于接收文本和Prompt的模型
 class PromptTextInput(BaseModel):
+    user_id: UUID
     text: str
     prompt: str
+    model: ModelChoice = Field(ModelChoice.deepseek_v3, description="要使用的模型标识")
+
+class JsonInputWithModel(BaseModel):
+    user_id: UUID
+    model: ModelChoice = Field(ModelChoice.deepseek_v3, description="要使用的模型标识")
+    data: Dict[str, Any]
+
 
 # --- 简历生成相关的结构化模型 ---
 class ContactInfo(BaseModel):
@@ -117,14 +126,6 @@ class UserDocQuery(BaseModel):
     """用于需要用户ID的请求体的模式。"""
     user_id: uuid.UUID
 
-
-# class DocumentVersionHistoryItem(BaseModel):
-#     """用于文档历史记录列表项的模式。"""
-#     id: uuid.UUID
-#     version_number: int
-#     created_at: datetime
-#     content_snippet: str
-
 # --- 新增 Schema 用于历史记录列表 ---
 class DocumentVersionHistoryItem(BaseModel):
     id: UUID
@@ -136,18 +137,11 @@ class DocumentVersionHistoryItem(BaseModel):
         "from_attributes": True,
     }
 
-# class DocumentVersionContent(BaseModel):
-#     """用于返回版本完整内容的模式。"""
-#     id: uuid.UUID
-#     content: str
-#
-#     class Config:
-#         from_attributes = True
-
 # --- 新增 Schema 用于返回单个版本的完整内容 ---
 class DocumentVersionContent(BaseModel):
     id: UUID
     content: str
+    user_profile: Optional[str] = None
 
     model_config = {
         "from_attributes": True,
@@ -163,33 +157,17 @@ class TokenResponse(BaseModel):
         "from_attributes": True
     }
 
-# class DocumentSave(BaseModel):
-#     """用于保存文档内容的输入模式。"""
-#     user_id: uuid.UUID
-#     content_md: str
 
 # 请求体
 class DocumentSave(BaseModel):
     user_id: UUID
     content_md: str = Field(..., min_length=1)
+    user_profile: Optional[str] = Field("", description="前端传入的用户Profile文本")
 
     model_config = {
         "populate_by_name": True
     }
 
-# 响应体：包含文档元信息和当前版本内容
-# class DocumentWithContent(BaseModel):
-#     id: UUID
-#     user_id: UUID
-#     type: DocumentTypeEnum
-#     current_version_id: UUID
-#     content_md: str
-#     created_at: datetime
-#     updated_at: datetime
-#
-#     model_config = {
-#         "from_attributes": True
-#     }
 
 class DocumentWithContent(BaseModel):
     """用于返回文档及其当前版本内容的模式。"""
@@ -217,45 +195,3 @@ class DocumentListItem(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# class UserCreate(BaseModel):
-#     email: EmailStr
-#     password_hash: str = Field(..., min_length=40, max_length=255)
-#     role: str = Field('guest', pattern=r'^(guest|vvip|consultant|etc\.\.)$')
-#     status: int = Field(1, ge=0, le=2)
-#     failed_login_attempts: int = 0
-#     locked_until: datetime | None = None
-#     last_login_at: datetime | None = None
-#     deleted_at: datetime | None = None
-#     user_metadata: dict = Field(default_factory=dict, alias="metadata")
-#
-#     model_config = {
-#         "populate_by_name": True
-#     }
-#
-# class UserResponse(BaseModel):
-#     id: UUID
-#     email: EmailStr
-#     role: str
-#     status: int
-#     failed_login_attempts: int
-#     locked_until: datetime | None
-#     last_login_at: datetime | None
-#     created_at: datetime
-#     updated_at: datetime
-#     deleted_at: datetime | None
-#     user_metadata: dict = Field(..., alias="metadata")
-#
-#     model_config = {
-#         "from_attributes": True,
-#         "populate_by_name": True
-#     }
-
-# 请求体，只要 user_id
-
-#
-# # 用户登录请求和响应
-# class UserLogin(BaseModel):
-#     email: EmailStr
-#     password_hash: str = Field(..., min_length=40, max_length=255)
