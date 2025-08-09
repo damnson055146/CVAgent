@@ -15,35 +15,36 @@ export const API_ENDPOINTS = {
   CV: {
     PARSE_PDF: '/parse-resume/',
     PARSE_TEXT: '/parse-resume-text/',
+    // 注意：generate-resume接口在后端README中未找到，暂时保留但标记为待确认
     GENERATE_PDF: '/generate-resume/',
     EVALUATE: '/evaluate-resume/',
     OPTIMIZE: '/optimize-text/',
     EXPAND: '/expand-text/',
     CONTRACT: '/contract-text/',
     CUSTOM_PROMPT: '/modified-text-prompt/',
-    // #todo: 接口&请求改动至后端新的端口名 - 文档保存接口需要修改为 /api/documents/resume/create
-    SAVE: '/api/documents/resume/save',
-    // #todo: 接口&请求改动至后端新的端口名 - 文档详情接口需要修改为 /api/versions/{doc_id}/content
-    GET_DETAIL: '/documents/resume/',
-    // #todo: 接口&请求改动至后端新的端口名 - 添加版本接口需要修改为 /api/versions/{doc_id}/save
-    ADD_VERSION: '/documents/resume/{id}/versions',
-    // #todo: 接口&请求改动至后端新的端口名 - 获取历史接口需要修改为 /api/documents/resume/history
+    // 修复：文档保存接口改为 /api/documents/resume/create
+    SAVE: '/api/documents/resume/create',
+    // 修复：文档详情接口改为 /api/versions/{doc_id}/content
+    GET_DETAIL: '/api/versions/',
+    // 修复：添加版本接口改为 /api/versions/{doc_id}/save
+    ADD_VERSION: '/api/versions/',
+    // 修复：获取历史接口改为 /api/documents/resume/history
     GET_HISTORY: '/api/documents/resume/history',
-    // #todo: 接口&请求改动至后端新的端口名 - 获取版本接口需要修改为 /api/versions/{version_id}/content
+    // 修复：获取版本接口改为 /api/versions/{version_id}/content
     GET_VERSION: '/api/versions/',
   },
   PS: {
-    // #todo: 接口&请求改动至后端新的端口名 - 个人陈述生成接口需要修改为 /generate-statement/
-    GENERATE: '/generate_statement/'
+    // 修复：个人陈述生成接口改为 /generate-statement/
+    GENERATE: '/generate-statement/'
   },
   REC: {
-    // #todo: 接口&请求改动至后端新的端口名 - 推荐信生成接口需要修改为 /generate-recommendation/
-    GENERATE: '/generate_recommendation/'
+    // 修复：推荐信生成接口改为 /generate-recommendation/
+    GENERATE: '/generate-recommendation/'
   },
   DOCUMENTS: {
-    // #todo: 接口&请求改动至后端新的端口名 - 文档保存接口需要修改为 /api/documents/{doc_type}/create
-    SAVE: '/api/documents_save/',
-    // #todo: 接口&请求改动至后端新的端口名 - 文档获取接口需要修改为 /api/documents/{doc_type}/history
+    // 修复：文档保存接口改为 /api/documents/{doc_type}/create
+    SAVE: '/api/documents/',
+    // 修复：文档获取接口改为 /api/documents/{doc_type}/history
     GET: '/api/documents/'
   }
 };

@@ -6,6 +6,16 @@ const getHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
+// 获取用户ID
+const getUserId = () => {
+  return localStorage.getItem('user_id');
+};
+
+// 获取默认模型
+const getDefaultModel = () => {
+  return 'deepseek-ai/DeepSeek-V3';
+};
+
 const handleResponse = async (res) => {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -16,11 +26,14 @@ const handleResponse = async (res) => {
 
 export const generatePersonalStatement = async (inputText) => {
   try {
-    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id和model到请求体，格式为 { user_id, text, model }
     const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PS.GENERATE}`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ text: inputText }),
+      body: JSON.stringify({ 
+        user_id: getUserId(), 
+        text: inputText, 
+        model: getDefaultModel() 
+      }),
     });
     return handleResponse(res);
   } catch (error) {

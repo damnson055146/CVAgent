@@ -16,6 +16,16 @@ const getHeaders = () => {
   return headers;
 };
 
+// 获取用户ID
+const getUserId = () => {
+  return localStorage.getItem('user_id');
+};
+
+// 获取默认模型
+const getDefaultModel = () => {
+  return 'deepseek-ai/DeepSeek-V3';
+};
+
 // 统一响应处理
 const handleResponse = async (res) => {
   if (!res.ok) {
@@ -28,12 +38,12 @@ const handleResponse = async (res) => {
 const agentAPI = {
   /**
    * 1. 上传 PDF 并解析 → JSON (/parse-resume/)
-   * 
    */
   parsePDFResume: async (file) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 需要添加model和user_id到formData，格式为 { file, model, user_id }
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('model', getDefaultModel());
+    formData.append('user_id', getUserId());
 
     const headers = {
       'api_key': API_KEY,
@@ -58,22 +68,24 @@ const agentAPI = {
    * 2. 上传简历文本并解析 → JSON (/parse-resume-text/)
    */
   parseTextResume: async (text) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id到请求体
-    const res = await fetch(`${API_BASE_URL}/parse-resume-text/`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.PARSE_TEXT}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ 
+        user_id: getUserId(), 
+        text, 
+        model: getDefaultModel() 
+      }),
     });
     return handleResponse(res);
   },
 
   /**
    * 3. 生成 PDF 简历 → Blob (/generate-resume/)
+   * 注意：此接口在后端README中未找到，需要确认是否存在
    */
   generateResumePDF: async (profileJson) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 此接口在后端README中未找到，需要确认是否存在
-    const res = await fetch(`${API_BASE_URL}/generate-resume/`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GENERATE_PDF}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(profileJson),
@@ -85,22 +97,22 @@ const agentAPI = {
     return res.blob();
   },
 
-  
   /**
-   * 5. 简历测评 → 文本 (/process_json_to_text/)
+   * 5. 简历测评 → 文本 (/evaluate-resume/)
    *    直接传整个简历 JSON 对象
    */
   evaluateResume: async (resumeJson) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id和model到请求体，格式为 { user_id, model, data: resumeJson }
-    const res = await fetch(`${API_BASE_URL}/evaluate-resume/`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.EVALUATE}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify(resumeJson),
+      body: JSON.stringify({ 
+        user_id: getUserId(), 
+        model: getDefaultModel(), 
+        data: resumeJson 
+      }),
     });
     return handleResponse(res);
   },
-
 
   /**
    * 选区优化
@@ -108,12 +120,14 @@ const agentAPI = {
    * @returns {Promise<{rewritten_text: string}>}
    */
   optimizeSelection: async (text) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id和model到请求体，格式为 { user_id, text, model }
-    const res = await fetch(`${API_BASE_URL}/optimize-text/`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.OPTIMIZE}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ 
+        user_id: getUserId(), 
+        text, 
+        model: getDefaultModel() 
+      }),
     });
     return handleResponse(res);
   },
@@ -124,12 +138,14 @@ const agentAPI = {
    * @returns {Promise<{expanded_text: string}>}
    */
   expandSelection: async (text) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id和model到请求体，格式为 { user_id, text, model }
-    const res = await fetch(`${API_BASE_URL}/optimize-text/`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.EXPAND}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ 
+        user_id: getUserId(), 
+        text, 
+        model: getDefaultModel() 
+      }),
     });
     return handleResponse(res);
   },
@@ -140,12 +156,14 @@ const agentAPI = {
    * @returns {Promise<{contracted_text: string}>}
    */
   contractSelection: async (text) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id和model到请求体，格式为 { user_id, text, model }
-    const res = await fetch(`${API_BASE_URL}/contract-text/`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.CONTRACT}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ 
+        user_id: getUserId(), 
+        text, 
+        model: getDefaultModel() 
+      }),
     });
     return handleResponse(res);
   },
@@ -157,14 +175,14 @@ const agentAPI = {
    * @returns {Promise<{modified_text: string}>}
    */
   customPromptSelection: async (text, prompt) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id和model到请求体，格式为 { user_id, text, prompt, model }
-    const res = await fetch(`${API_BASE_URL}/modified-text-prompt/`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.CUSTOM_PROMPT}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
       body: JSON.stringify({ 
-        text,
-        prompt,
+        user_id: getUserId(), 
+        text, 
+        prompt, 
+        model: getDefaultModel() 
       }),
     });
     return handleResponse(res);
@@ -177,14 +195,11 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   saveResume: async (content, userId) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 接口地址需要修改为 /api/documents/resume/create，请求体格式正确
     const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.SAVE}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
       body: JSON.stringify({
         user_id: userId,
-        content_md: content,
       }),
     });
     return handleResponse(res);
@@ -196,10 +211,12 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   getResumeDetail: async (docId) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 接口地址需要修改为 /api/versions/{doc_id}/content，需要添加user_id到请求体
-    const res = await fetch(`${API_BASE_URL}/documents/resume/${docId}`, {
-      method: 'GET',
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GET_DETAIL}${docId}/content`, {
+      method: 'POST',
       headers: getHeaders(),
+      body: JSON.stringify({
+        user_id: getUserId(),
+      }),
     });
     return handleResponse(res);
   },
@@ -211,25 +228,13 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   addResumeVersion: async (docId, content) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 接口地址需要修改为 /api/versions/{doc_id}/save，请求体格式需要修改为 { user_id, content_md, user_profile? }
-    const formData = new FormData();
-    formData.append('content', content);
-    formData.append('content_format', 'markdown');
-
-    const headers = {
-      'api_key': API_KEY,
-    };
-    
-    // 添加Authorization header
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(`${API_BASE_URL}/documents/resume/${docId}/versions`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.ADD_VERSION}${docId}/save`, {
       method: 'POST',
-      headers: headers,
-      body: formData,
+      headers: getHeaders(),
+      body: JSON.stringify({
+        user_id: getUserId(),
+        content_md: content,
+      }),
     });
     return handleResponse(res);
   },
@@ -240,11 +245,9 @@ const agentAPI = {
    * @returns {Promise<Array>}
    */
   getResumeHistory: async (userId) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 接口地址和请求体格式正确
-    const res = await fetch(`${API_BASE_URL}/api/documents/resume/history`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GET_HISTORY}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
       body: JSON.stringify({
         user_id: userId,
       }),
@@ -258,15 +261,16 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   getResumeVersion: async (versionId) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 接口地址正确，但需要添加user_id到请求体，方法需要改为POST
     console.log('正在获取版本内容，版本ID:', versionId);
-    console.log('请求URL:', `${API_BASE_URL}/api/versions/${versionId}/content`);
+    console.log('请求URL:', `${API_BASE_URL}${API_ENDPOINTS.CV.GET_VERSION}${versionId}/content`);
     console.log('请求头:', getHeaders());
     
-    const res = await fetch(`${API_BASE_URL}/api/versions/${versionId}/content`, {
-      method: 'GET',
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GET_VERSION}${versionId}/content`, {
+      method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',
+      body: JSON.stringify({
+        user_id: getUserId(),
+      }),
     });
     
     console.log('响应状态:', res.status);
@@ -288,15 +292,13 @@ const agentAPI = {
    * @returns {Promise<Object>}
    */
   deleteResumeVersion: async (versionId, userId) => {
-    // #todo: 接口&请求改动至后端新的端口名 - 接口地址和请求体格式正确
     console.log('正在删除版本，版本ID:', versionId, '用户ID:', userId);
-    console.log('请求URL:', `${API_BASE_URL}/api/versions/${versionId}/delete`);
+    console.log('请求URL:', `${API_BASE_URL}${API_ENDPOINTS.CV.GET_VERSION}${versionId}/delete`);
     console.log('请求头:', getHeaders());
     
-    const res = await fetch(`${API_BASE_URL}/api/versions/${versionId}/delete`, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GET_VERSION}${versionId}/delete`, {
       method: 'DELETE',
       headers: getHeaders(),
-      credentials: 'include',
       body: JSON.stringify({
         user_id: userId,
       }),
