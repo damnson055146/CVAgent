@@ -21,20 +21,29 @@ export const API_ENDPOINTS = {
     EXPAND: '/expand-text/',
     CONTRACT: '/contract-text/',
     CUSTOM_PROMPT: '/modified-text-prompt/',
+    // #todo: 接口&请求改动至后端新的端口名 - 文档保存接口需要修改为 /api/documents/resume/create
     SAVE: '/api/documents/resume/save',
+    // #todo: 接口&请求改动至后端新的端口名 - 文档详情接口需要修改为 /api/versions/{doc_id}/content
     GET_DETAIL: '/documents/resume/',
+    // #todo: 接口&请求改动至后端新的端口名 - 添加版本接口需要修改为 /api/versions/{doc_id}/save
     ADD_VERSION: '/documents/resume/{id}/versions',
+    // #todo: 接口&请求改动至后端新的端口名 - 获取历史接口需要修改为 /api/documents/resume/history
     GET_HISTORY: '/api/documents/resume/history',
+    // #todo: 接口&请求改动至后端新的端口名 - 获取版本接口需要修改为 /api/versions/{version_id}/content
     GET_VERSION: '/api/versions/',
   },
   PS: {
+    // #todo: 接口&请求改动至后端新的端口名 - 个人陈述生成接口需要修改为 /generate-statement/
     GENERATE: '/generate_statement/'
   },
   REC: {
+    // #todo: 接口&请求改动至后端新的端口名 - 推荐信生成接口需要修改为 /generate-recommendation/
     GENERATE: '/generate_recommendation/'
   },
   DOCUMENTS: {
+    // #todo: 接口&请求改动至后端新的端口名 - 文档保存接口需要修改为 /api/documents/{doc_type}/create
     SAVE: '/api/documents_save/',
+    // #todo: 接口&请求改动至后端新的端口名 - 文档获取接口需要修改为 /api/documents/{doc_type}/history
     GET: '/api/documents/'
   }
 };

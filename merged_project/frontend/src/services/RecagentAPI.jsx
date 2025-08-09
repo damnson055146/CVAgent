@@ -16,6 +16,7 @@ const handleResponse = async (res) => {
 
 export const generateRec = async (inputText) => {
   try {
+    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id和model到请求体，格式为 { user_id, text, model }
     const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.REC.GENERATE}`, {
       method: 'POST',
       headers: getHeaders(),
@@ -24,6 +25,7 @@ export const generateRec = async (inputText) => {
     return handleResponse(res);
   } catch (error) {
     console.error('Error generating recommendation letter:', error);
+    throw error;
     throw error;
   }
 };

@@ -27,11 +27,12 @@ const Sidebar = ({ activeItem, onChange, onLogout }) => {
     const fetchUserInfo = async () => {
       try {
         const token = localStorage.getItem('access_token');
-        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.ME}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+              // #todo: 接口&请求改动至后端新的端口名 - 认证接口格式正确，但需要确认是否需要user_id
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.ME}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
         if (response.ok) {
           const user = await response.json();
           setUserInfo(user);

@@ -22,6 +22,7 @@ const App = () => {
       const token = localStorage.getItem('access_token');
       if (token) {
         try {
+          // #todo: 接口&请求改动至后端新的端口名 - 认证接口格式正确，但需要确认是否需要user_id
           const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.ME}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -48,6 +49,7 @@ const App = () => {
     try {
       const token = localStorage.getItem('access_token');
       if (token) {
+        // #todo: 接口&请求改动至后端新的端口名 - 登出接口格式正确
         await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH.LOGOUT}`, {
           method: 'POST',
           headers: {

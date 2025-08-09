@@ -16,6 +16,7 @@ const handleResponse = async (res) => {
 
 export const generatePersonalStatement = async (inputText) => {
   try {
+    // #todo: 接口&请求改动至后端新的端口名 - 需要添加user_id和model到请求体，格式为 { user_id, text, model }
     const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PS.GENERATE}`, {
       method: 'POST',
       headers: getHeaders(),
