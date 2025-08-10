@@ -15,7 +15,7 @@ RUN apt-get update \
          libpq-dev \
          gcc \
          postgresql-client \
-         curl \
+          curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -28,6 +28,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY main.py .
 COPY app/ ./app
 # 可选：将示例环境复制为容器内默认 .env（compose 会通过 environment/env_file 覆盖）
+# 允许通过 compose 的 env_file/environment 注入真实变量，示例留在镜像中供本地调试
 COPY env.example .env
 
 # 等待数据库启动的脚本

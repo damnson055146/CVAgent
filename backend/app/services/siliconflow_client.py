@@ -10,21 +10,22 @@ from openai import OpenAI, APIConnectionError, APITimeoutError, APIError
 # Load environment variables from .env file
 load_dotenv()
 
-_API_KEYS: List[str] = []
+_API_KEYS: List[str] = []  # deprecated; kept for backward compatibility
 _API_KEYS_LOADED = False
 _RR_INDEX = 0
 _RR_LOCK = threading.Lock()
 
 # Per-key quota & windowed counters
 class _KeyState:
-    def __init__(self, api_key: str, rpm_limit: Optional[int], tpm_limit: Optional[int]):
+    def __init__(self, *, provider: str, base_url: str, api_key: str, rpm_limit: Optional[int], tpm_limit: Optional[int]):
+        self.provider = provider  # e.g., "siliconflow" or "openai"
+        self.base_url = base_url
         self.api_key = api_key
         self.rpm_limit = rpm_limit
         self.tpm_limit = tpm_limit
-        self.req_times: deque[float] = deque()          # timestamps of requests within last 60s
-        self.token_usages: deque[tuple[float, int]] = deque()  # (timestamp, tokens) within last 60s
+        self.req_times: deque[float] = deque()
+        self.token_usages: deque[tuple[float, int]] = deque()
         self.lock = threading.Lock()
-        # health / circuit breaker
         self.consecutive_failures: int = 0
         self.unhealthy_until: Optional[float] = None
 
@@ -42,18 +43,10 @@ _CB_SECONDS = float(os.getenv("SILICONFLOW_CIRCUIT_BREAK_SECONDS", "60") or 60)
 
 
 def _load_api_keys_once() -> None:
-    global _API_KEYS, _API_KEYS_LOADED, _KEY_STATES
+    global _API_KEYS_LOADED, _KEY_STATES
     if _API_KEYS_LOADED:
         return
-    key1 = os.getenv("SILICONFLOW_API_KEY")
-    # 如果未设置第二个Key，使用第一个Key充当第二个
-    key2 = os.getenv("SILICONFLOW_API_KEY_2", key1)
-    _API_KEYS = [k for k in [key1, key2] if k]
-    if not _API_KEYS:
-        raise EnvironmentError("No SiliconFlow API keys found. Please set SILICONFLOW_API_KEY (and optionally SILICONFLOW_API_KEY_2).")
-    _API_KEYS_LOADED = True
-    # Load per-key limits (RPM/TPM). If not set, no limit.
-    # Support either key-specific or index-based envs
+    # util to parse int envs
     def _int_or_none(value: Optional[str]) -> Optional[int]:
         if value is None or value == "":
             return None
@@ -61,20 +54,37 @@ def _load_api_keys_once() -> None:
             return int(value)
         except Exception:
             return None
-    k1_rpm = _int_or_none(os.getenv("SILICONFLOW_KEY1_RPM"))
-    k1_tpm = _int_or_none(os.getenv("SILICONFLOW_KEY1_TPM"))
-    k2_rpm = _int_or_none(os.getenv("SILICONFLOW_KEY2_RPM"))
-    k2_tpm = _int_or_none(os.getenv("SILICONFLOW_KEY2_TPM"))
-    # If only one key exists, second limits are ignored
-    limits = [(k1_rpm, k1_tpm)]
-    if len(_API_KEYS) > 1:
-        limits.append((k2_rpm, k2_tpm))
+
+    # SiliconFlow keys (up to 2)
+    sf_base = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+    sf_keys: List[Tuple[str, Optional[int], Optional[int]]] = []
+    sf1 = os.getenv("SILICONFLOW_API_KEY", "")
+    if sf1:
+        sf_keys.append((sf1, _int_or_none(os.getenv("SILICONFLOW_KEY1_RPM")), _int_or_none(os.getenv("SILICONFLOW_KEY1_TPM"))))
+    sf2 = os.getenv("SILICONFLOW_API_KEY_2", "")
+    if sf2:
+        sf_keys.append((sf2, _int_or_none(os.getenv("SILICONFLOW_KEY2_RPM")), _int_or_none(os.getenv("SILICONFLOW_KEY2_TPM"))))
+
+    # OpenAI keys (up to 2)
+    oa_base = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    oa_keys: List[Tuple[str, Optional[int], Optional[int]]] = []
+    oa1 = os.getenv("OPENAI_API_KEY", "")
+    if oa1:
+        oa_keys.append((oa1, _int_or_none(os.getenv("OPENAI_KEY1_RPM")), _int_or_none(os.getenv("OPENAI_KEY1_TPM"))))
+    oa2 = os.getenv("OPENAI_API_KEY_2", "")
+    if oa2:
+        oa_keys.append((oa2, _int_or_none(os.getenv("OPENAI_KEY2_RPM")), _int_or_none(os.getenv("OPENAI_KEY2_TPM"))))
+
+    # Build states
     _KEY_STATES = []
-    for idx, api_key in enumerate(_API_KEYS):
-        rpm, tpm = (None, None)
-        if idx < len(limits):
-            rpm, tpm = limits[idx]
-        _KEY_STATES.append(_KeyState(api_key, rpm, tpm))
+    for k, rpm, tpm in sf_keys:
+        _KEY_STATES.append(_KeyState(provider="siliconflow", base_url=sf_base, api_key=k, rpm_limit=rpm, tpm_limit=tpm))
+    for k, rpm, tpm in oa_keys:
+        _KEY_STATES.append(_KeyState(provider="openai", base_url=oa_base, api_key=k, rpm_limit=rpm, tpm_limit=tpm))
+
+    if not _KEY_STATES:
+        raise EnvironmentError("No API keys configured. Set SILICONFLOW_API_KEY and/or OPENAI_API_KEY (empty string means disabled).")
+    _API_KEYS_LOADED = True
 
 
 def _prune_windows(state: _KeyState, now: float) -> None:
@@ -102,9 +112,9 @@ def _can_use(state: _KeyState, now: float, est_tokens: int) -> bool:
     return True
 
 
-def _acquire_key(est_tokens: Optional[int] = None) -> tuple[str, int]:
+def _acquire_key(est_tokens: Optional[int] = None) -> int:
     """Pick a key respecting RPM/TPM limits. Blocks if necessary until some key is available.
-    Returns (api_key, key_index)."""
+    Returns key_index."""
     global _RR_INDEX
     if not _API_KEYS_LOADED:
         _load_api_keys_once()
@@ -126,7 +136,7 @@ def _acquire_key(est_tokens: Optional[int] = None) -> tuple[str, int]:
                         break
             if picked_idx is not None:
                 _RR_INDEX = (picked_idx + 1) % n
-                return _KEY_STATES[picked_idx].api_key, picked_idx
+                return picked_idx
         # none available; compute next availability time
         min_sleep = 0.05
         for st in _KEY_STATES:
@@ -172,9 +182,9 @@ def _mark_failure(key_index: int) -> None:
 
 
 def _get_client_with_index(est_tokens: Optional[int] = None) -> tuple[OpenAI, int]:
-    base_url = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
-    api_key, idx = _acquire_key(est_tokens)
-    return OpenAI(api_key=api_key, base_url=base_url), idx
+    idx = _acquire_key(est_tokens)
+    st = _KEY_STATES[idx]
+    return OpenAI(api_key=st.api_key, base_url=st.base_url), idx
 
 _DEFAULT_MODEL = os.getenv("SILICONFLOW_MODEL", "deepseek-ai/DeepSeek-V3")
 
@@ -557,3 +567,47 @@ def generate_recommendation(text: str, *, model: str = _DEFAULT_MODEL) -> Dict[s
 def name_document(text: str, *, model: str = _DEFAULT_MODEL) -> str:
     """Names a document based on its content."""
     return _call_siliconflow(_NAME_DOCUMENT_PROMPT, text, model, json_output=False)
+
+
+# 生成用于个人陈述写作的“用户画像”Markdown段落
+_GENERATE_PS_PROFILE_PROMPT = """你是一名资深留学文书导师。请基于用户提供的个人经历与目标（Markdown 文本）提炼出一段用于撰写个人陈述的“用户画像”。\n\n要求：\n- 只输出一段 Markdown 文本（不含```代码块标记、不含JSON、不含解释与前后缀）\n- 语言精炼且信息密度高，150–250字为宜\n- 覆盖要点：学术背景与优势、研究/职业兴趣、核心技能与成果、领导/活动亮点、申请动机与目标、与目标项目/导师的契合度与差异化。不可以捏造用户信息，所有输出的信息必须来源于输入信息\n\n输入：\n{{#sys.query#}}"""
+
+def generate_personal_statement_profile(text: str, *, model: str = _DEFAULT_MODEL) -> str:
+    """Generates a concise user persona paragraph (Markdown) for personal statement writing."""
+    return _call_siliconflow(_GENERATE_PS_PROFILE_PROMPT, text, model, json_output=False)
+
+
+def list_all_models() -> Dict[str, Any]:
+    """Enumerate models across all configured providers/keys.
+    Returns { "providers": [{provider, base_url, key_index, models, error?}], "unique_models": [..] }
+    """
+    if not _API_KEYS_LOADED:
+        _load_api_keys_once()
+    providers: List[Dict[str, Any]] = []
+    unique: set[str] = set()
+    for idx, st in enumerate(_KEY_STATES):
+        try:
+            client = OpenAI(api_key=st.api_key, base_url=st.base_url)
+            resp = client.models.list()
+            ids: List[str] = []
+            data = getattr(resp, "data", []) or []
+            for m in data:
+                mid = getattr(m, "id", None)
+                if mid:
+                    ids.append(mid)
+                    unique.add(mid)
+            providers.append({
+                "provider": st.provider,
+                "base_url": st.base_url,
+                "key_index": idx,
+                "models": ids,
+            })
+        except Exception as exc:
+            providers.append({
+                "provider": st.provider,
+                "base_url": st.base_url,
+                "key_index": idx,
+                "models": [],
+                "error": str(exc),
+            })
+    return {"providers": providers, "unique_models": sorted(list(unique))}

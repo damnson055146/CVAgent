@@ -13,6 +13,7 @@ from app.services import siliconflow_client as sf_client
 from app.models.api_log_models import APILog
 from app.database import get_db
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from uuid import UUID
 
 # 本地缓存存储
@@ -290,4 +291,70 @@ async def name_document(input_data: TextInput, db: Session = Depends(get_db)):
 
 
 
+
+
+@router.post("/personal-statement-profile/")
+async def personal_statement_profile(input_data: TextInput, db: Session = Depends(get_db)):
+    _ensure_user_exists(db, input_data.user_id)
+    """
+    接收前端传入的 Markdown 内容（含个人陈述相关信息），并调用大模型生成用于撰写个人陈述的用户画像段落（Markdown）。
+    同时将结果写入 personal_statement_profiles 表并记录 API 调用日志。
+    请求体包含：user_id, text (markdown), model。
+    返回：{ "profile_md": "..." }
+    """
+    try:
+        content, meta = await run_in_threadpool(
+            sf_client._call_siliconflow_with_meta,
+            sf_client._GENERATE_PS_PROFILE_PROMPT,
+            input_data.text,
+            input_data.model.value,
+            False
+        )
+
+        # 写入日志
+        db.add(APILog(
+            user_id=input_data.user_id,
+            api_name="personal_statement_profile",
+            request_payload={"body": input_data.model_dump(mode="json")},
+            system_prompt=meta.get("system_prompt"),
+            model=meta.get("model"),
+            prompt_tokens=meta.get("prompt_tokens"),
+            completion_tokens=meta.get("completion_tokens"),
+            total_tokens=meta.get("total_tokens"),
+            response_text=str(content) if isinstance(content, str) else None
+        ))
+
+        # 写入 personal_statement_profiles 表
+        db.execute(
+                text("""
+                    INSERT INTO personal_statement_profiles (user_id, profile_md)
+                    VALUES (:user_id, :profile_md)
+                """),
+                {"user_id": str(input_data.user_id), "profile_md": content}
+            )
+
+        db.commit()
+        return JSONResponse(content={"profile_md": content})
+    except Exception as e:
+        # 发生异常也尽可能记录日志
+        try:
+            db.add(APILog(
+                user_id=input_data.user_id,
+                api_name="personal_statement_profile",
+                request_payload={"body": input_data.model_dump(mode="json")},
+                error=str(e)
+            ))
+            db.commit()
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"生成用户画像时发生内部错误: {e}")
+
+@router.get("/models/available")
+async def list_available_models():
+    """返回四个Key（两硅基流动、两OpenAI）可用的模型列表（若某Key为空则跳过）。"""
+    try:
+        data = await run_in_threadpool(sf_client.list_all_models)
+        return JSONResponse(content=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"拉取模型列表失败: {e}")
 

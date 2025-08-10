@@ -55,6 +55,15 @@ services:
       SILICONFLOW_CIRCUIT_BREAK_SECONDS: ${SILICONFLOW_CIRCUIT_BREAK_SECONDS:-60}
       SILICONFLOW_MODEL: ${SILICONFLOW_MODEL:-deepseek-ai/DeepSeek-V3}
       SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL:-https://api.siliconflow.cn/v1}
+
+      # OpenAI keys & limits (可留空)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_KEY_2: ${OPENAI_API_KEY_2:-}
+      OPENAI_KEY1_RPM: ${OPENAI_KEY1_RPM:-60}
+      OPENAI_KEY1_TPM: ${OPENAI_KEY1_TPM:-90000}
+      OPENAI_KEY2_RPM: ${OPENAI_KEY2_RPM:-60}
+      OPENAI_KEY2_TPM: ${OPENAI_KEY2_TPM:-90000}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
     ports:
       - "8699:8699"
     volumes:

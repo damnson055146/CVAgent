@@ -39,6 +39,8 @@
 - POST `/generate-statement/` body: { user_id, text, model }
 - POST `/generate-recommendation/` body: { user_id, text, model }
 - POST `/user-profile/` body: { user_id, text, model } → 返回 { document_name }
+- POST `/personal-statement-profile/` body: { user_id, text(markdown), model } → 返回 { profile_md }
+- GET `/models/available` → 返回所有已配置 Key（两硅基流动、两OpenAI）的可用模型列表
 
 说明：`model` 取值见枚举 `ModelChoice`（如 `deepseek-ai/DeepSeek-V3` 等）。
 
@@ -51,3 +53,25 @@
 3. `documents_versions.sql`
 4. `migration.sql`
 5. `api_logs.sql`
+6. `personal_statement_profile.sql`
+
+### 模型与负载均衡
+- 支持多提供商多密钥的负载均衡（轮询 + RPM/TPM 限速 + 熔断）：
+  - 硅基流动：`SILICONFLOW_API_KEY`, `SILICONFLOW_API_KEY_2`
+  - OpenAI(ChatGPT)：`OPENAI_API_KEY`, `OPENAI_API_KEY_2`
+  - 可选限速：`*_KEY{N}_RPM`, `*_KEY{N}_TPM`
+  - 提供商 Base URL：`SILICONFLOW_BASE_URL`, `OPENAI_BASE_URL`
+  - 允许留空，留空则自动跳过该 Key
+
+#### 列出可用模型
+- GET `/models/available`
+- 响应示例（精简）：
+```
+{
+  "providers": [
+    {"provider": "siliconflow", "base_url": "https://api.siliconflow.cn/v1", "key_index": 0, "models": ["deepseek-ai/DeepSeek-V3", "..."]},
+    {"provider": "openai", "base_url": "https://api.openai.com/v1", "key_index": 2, "models": ["gpt-4o", "..."]}
+  ],
+  "unique_models": ["deepseek-ai/DeepSeek-V3", "gpt-4o", "..."]
+}
+```
