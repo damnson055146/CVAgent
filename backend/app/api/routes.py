@@ -7,7 +7,7 @@ from typing import Dict, Any
 from datetime import datetime
 import uuid
 
-from app.models.schemas import TextInput, NewResumeProfile, PromptTextInput, ModelChoice, JsonInputWithModel
+from app.models.schemas import TextInput, NewResumeProfile, PromptTextInput, ModelChoice, JsonInputWithModel, BrainstormInput
 from app.models import user_models
 from app.services import siliconflow_client as sf_client
 from app.models.api_log_models import APILog
@@ -288,6 +288,66 @@ async def name_document(input_data: TextInput, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"为文档命名时发生内部错误: {e}")
 
 
-
-
+@router.post("/api/brainstorm/questions")
+async def generate_brainstorm_questions(input_data: BrainstormInput, db: Session = Depends(get_db)):
+    """
+    生成头脑风暴问题
+    """
+    _ensure_user_exists(db, input_data.user_id)
+    
+    try:
+        # 构建提示词
+        prompt = input_data.prompt_template
+        if input_data.cv_content:
+            prompt = prompt.replace('{cv_content}', input_data.cv_content)
+        
+        if input_data.manual_info:
+            manual_info_str = "\n".join([f"{k}: {v}" for k, v in input_data.manual_info.items() if v])
+            prompt = prompt.replace('{manual_info}', manual_info_str)
+        
+        if input_data.selected_text:
+            prompt = prompt.replace('{selected_text}', input_data.selected_text)
+        
+        # 调用AI生成头脑风暴问题
+        content, meta = await run_in_threadpool(
+            sf_client._call_siliconflow_with_meta, 
+            prompt, 
+            "", 
+            input_data.model.value, 
+            True
+        )
+        
+        result = content
+        if "error" in result:
+            raise HTTPException(status_code=502, detail=result["error"])
+        
+        # 记录API调用日志
+        log = APILog(
+            user_id=input_data.user_id,
+            api_name="brainstorm_questions",
+            request_payload={"body": input_data.model_dump(mode="json")},
+            system_prompt=meta.get("system_prompt"),
+            model=meta.get("model"),
+            prompt_tokens=meta.get("prompt_tokens"),
+            completion_tokens=meta.get("completion_tokens"),
+            total_tokens=meta.get("total_tokens"),
+            response_text=json.dumps(result, ensure_ascii=False)
+        )
+        db.add(log)
+        db.commit()
+        
+        return JSONResponse(content=result)
+        
+    except Exception as e:
+        try:
+            db.add(APILog(
+                user_id=input_data.user_id,
+                api_name="brainstorm_questions",
+                request_payload={"body": input_data.model_dump(mode="json") if 'input_data' in locals() else {}},
+                error=str(e)
+            ))
+            db.commit()
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=str(e))
 

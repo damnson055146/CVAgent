@@ -195,3 +195,16 @@ class DocumentListItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class BrainstormInput(BaseModel):
+    """头脑风暴输入模型"""
+    user_id: uuid.UUID
+    cv_content: Optional[str] = ""
+    manual_info: Optional[Dict[str, str]] = {}
+    prompt_template: str
+    model: ModelChoice = Field(ModelChoice.deepseek_v3, description="要使用的模型标识")
+    selected_text: Optional[str] = ""
+
+    class Config:
+        from_attributes = True

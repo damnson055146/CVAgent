@@ -41,3 +41,59 @@ export const generatePersonalStatement = async (inputText) => {
     throw error;
   }
 };
+
+// 头脑风暴相关API
+export const generateBrainstormQuestions = async (params) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PS.BRAINSTORM}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        user_id: getUserId(),
+        cv_content: params.cvContent || '',
+        manual_info: params.manualInfo || {},
+        prompt_template: params.promptTemplate || '',
+        model: params.model || getDefaultModel(),
+        selected_text: params.selectedText || ''
+      }),
+    });
+    return handleResponse(res);
+  } catch (error) {
+    console.error('Error generating brainstorm questions:', error);
+    throw error;
+  }
+};
+
+// 获取用户CV列表
+export const getUserCVs = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GET_HISTORY}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        user_id: getUserId(),
+      }),
+    });
+    return handleResponse(res);
+  } catch (error) {
+    console.error('Error getting user CVs:', error);
+    throw error;
+  }
+};
+
+// 获取CV最新版本内容
+export const getCVLatestVersion = async (cvId) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GET_VERSION}${cvId}/content`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        user_id: getUserId(),
+      }),
+    });
+    return handleResponse(res);
+  } catch (error) {
+    console.error('Error getting CV latest version:', error);
+    throw error;
+  }
+};

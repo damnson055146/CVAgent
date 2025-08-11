@@ -35,7 +35,9 @@ export const API_ENDPOINTS = {
   },
   PS: {
     // 修复：个人陈述生成接口改为 /generate-statement/
-    GENERATE: '/generate-statement/'
+    GENERATE: '/generate-statement/',
+    // 头脑风暴接口
+    BRAINSTORM: '/api/brainstorm/questions'
   },
   REC: {
     // 修复：推荐信生成接口改为 /generate-recommendation/

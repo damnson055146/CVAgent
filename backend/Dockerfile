@@ -27,8 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 # 拷贝应用代码
 COPY main.py .
 COPY app/ ./app
-# 可选：将示例环境复制为容器内默认 .env（compose 会通过 environment/env_file 覆盖）
-COPY env.example .env
+# 环境变量将通过 docker-compose 的 environment 或 env_file 设置
 
 # 等待数据库启动的脚本
 COPY wait-for-db.sh .

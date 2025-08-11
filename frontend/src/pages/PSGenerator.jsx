@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, FileText, Edit3, Loader2, ChevronUp, RefreshCw } from 'lucide-react';
+import { Send, FileText, Edit3, Loader2, ChevronUp, RefreshCw, Brain } from 'lucide-react';
 import Styleswitch from '../comcomponents/icons/Styleswitch';
 import ModelSelector from '../comcomponents/common/ModelSelector';
 import Button from '../comcomponents/common/Button';
-import { generatePersonalStatement } from '../services/PSagentAPI';
+import { generatePersonalStatement, generateBrainstormQuestions } from '../services/PSagentAPI';
+import BrainstormPanel from '../CVcomponents/BrainstormPanel';
+import BrainstormToolbar from '../CVcomponents/BrainstormToolbar';
 
 
 const PSGenerator = () => {
@@ -13,6 +15,13 @@ const PSGenerator = () => {
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [showRegenerateDropdown, setShowRegenerateDropdown] = useState(false);
     const [selectedRegenerateModel, setSelectedRegenerateModel] = useState('ChatGPT-4o');
+    
+    // 头脑风暴相关状态
+    const [showBrainstormPanel, setShowBrainstormPanel] = useState(false);
+    const [showBrainstormToolbar, setShowBrainstormToolbar] = useState(false);
+    const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
+    const [selectedText, setSelectedText] = useState('');
+    const [isBrainstormProcessing, setIsBrainstormProcessing] = useState(false);
 
     const handleGenerate = async () => {
         if (!inputText.trim()) {
@@ -63,6 +72,7 @@ const PSGenerator = () => {
     ];
 
     const regenerateDropdownRef = useRef(null);
+    const textareaRef = useRef(null);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -76,6 +86,54 @@ const PSGenerator = () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
+
+    // 处理文本选择事件
+    const handleTextSelection = () => {
+        const selection = window.getSelection();
+        if (selection.toString().trim()) {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            
+            setSelectedText(selection.toString());
+            setToolbarPosition({
+                x: rect.left + rect.width / 2,
+                y: rect.top - 10,
+                arrowLeft: '50%'
+            });
+            setShowBrainstormToolbar(true);
+        } else {
+            setShowBrainstormToolbar(false);
+        }
+    };
+
+    // 处理头脑风暴
+    const handleBrainstorm = async (prompt) => {
+        setIsBrainstormProcessing(true);
+        try {
+            const result = await generateBrainstormQuestions({
+                cvContent: '',
+                manualInfo: {},
+                promptTemplate: prompt,
+                selectedText: selectedText
+            });
+            
+            // 将头脑风暴结果添加到输入文本
+            const brainstormResult = `\n\n头脑风暴问题：\n${prompt}\n\n基于以上问题，请继续完善您的个人陈述：`;
+            setInputText(prev => prev + brainstormResult);
+            
+            setShowBrainstormToolbar(false);
+        } catch (error) {
+            console.error('Brainstorm failed:', error);
+            alert('头脑风暴失败，请重试');
+        } finally {
+            setIsBrainstormProcessing(false);
+        }
+    };
+
+    // 处理头脑风暴面板应用问题
+    const handleApplyBrainstormQuestions = (questions) => {
+        setInputText(prev => prev + `\n\n头脑风暴问题：\n${questions}\n\n基于以上问题，请继续完善您的个人陈述：`);
+    };
 
     const copyToClipboard = () => {
         if (!generatedStatement || !generatedStatement.个人陈述) return;
@@ -148,6 +206,16 @@ const PSGenerator = () => {
                                 type="ghost"
                                 size="sm"
                                 className="hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors whitespace-nowrap text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600"
+                                onClick={() => setShowBrainstormPanel(true)}
+                            >
+                                <Brain size={16} className="mr-1" />
+                                头脑风暴
+                            </Button>
+                            
+                            <Button
+                                type="ghost"
+                                size="sm"
+                                className="hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors whitespace-nowrap text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600"
                                 onClick={handleGenerate}
                                 disabled={isLoading || !inputText.trim()}
                             >
@@ -209,8 +277,11 @@ const PSGenerator = () => {
                     </div>
 
                     <textarea
+                        ref={textareaRef}
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
+                        onMouseUp={handleTextSelection}
+                        onKeyUp={handleTextSelection}
                         placeholder="请在此输入您的个人陈述内容..."
                         className="w-full flex-1 p-4 border border-gray-200 dark:border-gray-600 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-700 dark:text-gray-200 leading-relaxed bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400"
                     />
@@ -251,6 +322,26 @@ const PSGenerator = () => {
                     )}
                 </div>
             </div>
+            
+            {/* 头脑风暴面板 */}
+            {showBrainstormPanel && (
+                <BrainstormPanel
+                    onClose={() => setShowBrainstormPanel(false)}
+                    onApplyQuestions={handleApplyBrainstormQuestions}
+                />
+            )}
+            
+            {/* 头脑风暴浮动工具栏 */}
+            {showBrainstormToolbar && (
+                <BrainstormToolbar
+                    position={toolbarPosition}
+                    selectedText={selectedText}
+                    onBrainstorm={handleBrainstorm}
+                    isProcessing={isBrainstormProcessing}
+                    onClose={() => setShowBrainstormToolbar(false)}
+                    onPositionChange={setToolbarPosition}
+                />
+            )}
         </div>
     );
 };
