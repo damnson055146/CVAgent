@@ -577,6 +577,14 @@ def generate_personal_statement_profile(text: str, *, model: str = _DEFAULT_MODE
     return _call_siliconflow(_GENERATE_PS_PROFILE_PROMPT, text, model, json_output=False)
 
 
+# 从输入中判断候选人的姓名，仅返回姓名本身，无法确定则返回空字符串
+_EXTRACT_NAME_PROMPT = """请从以下用户提供的信息中判断候选人的真实姓名（中文或英文）。\n\n严格规则：\n- 只返回姓名本身，不要包含任何前后缀、标点、空格或解释性文字\n- 不得从邮箱地址、邮箱用户名、社交账号ID、链接、文件名或昵称推断姓名\n- 不得凭常识或占位符（如 zhangsan、lisi、test 等）猜测姓名\n- 仅当文本中明确写出姓名，或出现“姓名: / 姓名：/ 我叫 / 我的名字是 / My name is / Name:”等直陈表达时才返回\n- 若无法确定明确的姓名，请返回空字符串\n\n输入：\n{{#sys.query#}}"""
+
+def extract_name(text: str, *, model: str = _DEFAULT_MODEL) -> str:
+    """Extracts a person's name from free-form text. Returns empty string if uncertain."""
+    return _call_siliconflow(_EXTRACT_NAME_PROMPT, text, model, json_output=False)
+
+
 def list_all_models() -> Dict[str, Any]:
     """Enumerate models across all configured providers/keys.
     Returns { "providers": [{provider, base_url, key_index, models, error?}], "unique_models": [..] }

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException, Body, Path
 from typing import List # --- 新增导入 ---
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import text
 import os
 from dotenv import load_dotenv
 
@@ -143,6 +144,48 @@ def delete_document(
 
     db.commit()
     return
+
+
+# 读取 personal_statement_profiles 表，按创建时间降序返回 id, name, profile_md
+@app.post(
+    "/api/personal-statement-profiles",
+    tags=["用户画像 (PersonalStatementProfiles)"]
+)
+def list_personal_statement_profiles(
+    payload: dict = Body(..., example={"user_id": "00000000-0000-0000-0000-000000000000", "name": "张三"}),
+    db: Session = Depends(get_db)
+):
+    # 校验 name
+    name_value = str(payload.get("name", "")).strip()
+    if not name_value:
+        raise HTTPException(status_code=400, detail="name 不能为空")
+    # 校验 user_id
+    try:
+        uid = UUID(str(payload.get("user_id")))
+    except Exception:
+        raise HTTPException(status_code=400, detail="user_id 非法")
+
+    # 可选：验证用户是否存在且有效
+    user = db.query(user_models.User).filter(
+        user_models.User.id == uid,
+        user_models.User.deleted_at.is_(None),
+        user_models.User.is_active.is_(True)
+    ).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="无效或已禁用的用户")
+    rows = db.execute(text(
+        """
+        SELECT id, name, profile_md
+        FROM personal_statement_profiles
+        WHERE user_id = :user_id AND name = :name
+        ORDER BY created_at DESC
+        """
+    ), {"user_id": str(uid), "name": name_value}).mappings().all()
+    return [{
+        "id": str(r["id"]),
+        "name": r.get("name"),
+        "profile_md": r["profile_md"],
+    } for r in rows]
 
 #按类型获取文档列表
 @app.post(

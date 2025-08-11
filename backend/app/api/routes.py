@@ -311,6 +311,24 @@ async def personal_statement_profile(input_data: TextInput, db: Session = Depend
             False
         )
 
+        # 使用大模型从输入文本中提取姓名
+        name_text, _ = await run_in_threadpool(
+            sf_client._call_siliconflow_with_meta,
+            sf_client._EXTRACT_NAME_PROMPT,
+            input_data.text,
+            input_data.model.value,
+            False
+        )
+        extracted_name = (name_text or "").strip()
+        # 简单清洗常见前缀
+        for prefix in ["姓名：", "姓名:", "Name:", "name:"]:
+            if extracted_name.startswith(prefix):
+                extracted_name = extracted_name[len(prefix):].strip()
+        # 判空/无效
+        invalid_markers = {"", "未知", "不确定", "无", "N/A", "n/a", "null", "None"}
+        if extracted_name in invalid_markers:
+            raise HTTPException(status_code=400, detail="未检测到姓名信息，请补充姓名后重试")
+
         # 写入日志
         db.add(APILog(
             user_id=input_data.user_id,
@@ -326,15 +344,15 @@ async def personal_statement_profile(input_data: TextInput, db: Session = Depend
 
         # 写入 personal_statement_profiles 表
         db.execute(
-                text("""
-                    INSERT INTO personal_statement_profiles (user_id, profile_md)
-                    VALUES (:user_id, :profile_md)
-                """),
-                {"user_id": str(input_data.user_id), "profile_md": content}
-            )
+            text("""
+                INSERT INTO personal_statement_profiles (user_id, name, profile_md)
+                VALUES (:user_id, :name, :profile_md)
+            """),
+            {"user_id": str(input_data.user_id), "name": extracted_name, "profile_md": content}
+        )
 
         db.commit()
-        return JSONResponse(content={"profile_md": content})
+        return JSONResponse(content={"name": extracted_name, "profile_md": content})
     except Exception as e:
         # 发生异常也尽可能记录日志
         try:

@@ -26,6 +26,12 @@
 - DELETE `/api/versions/{version_id}/delete` body: { user_id }
 - POST `/api/versions/{doc_id}/user_profile_save` body: { user_id, user_profile }
 
+### 用户画像查询（main.py）
+- POST `/api/personal-statement-profiles` body: { user_id, name }
+  - 功能：按 `user_id` + `name` 精确匹配 `personal_statement_profiles`，按创建时间降序返回数组，每项包含 { id, name, profile_md }
+  - 400：`name 不能为空` 或 `user_id 非法`
+  - 401：`无效或已禁用的用户`
+
 说明：`doc_type ∈ { resume, personal_statement, recommendation }`
 
 ### 文本与简历处理（routes.py，基于 SiliconFlow）
@@ -39,7 +45,8 @@
 - POST `/generate-statement/` body: { user_id, text, model }
 - POST `/generate-recommendation/` body: { user_id, text, model }
 - POST `/user-profile/` body: { user_id, text, model } → 返回 { document_name }
-- POST `/personal-statement-profile/` body: { user_id, text(markdown), model } → 返回 { profile_md }
+- POST `/personal-statement-profile/` body: { user_id, text(markdown), model } → 返回 { name, profile_md }
+  - 行为：从文本中严格抽取姓名（Prompt 禁止从邮箱/链接/ID 等推断）；若无法确定姓名则返回 400，不入库
 - GET `/models/available` → 返回所有已配置 Key（两硅基流动、两OpenAI）的可用模型列表
 
 说明：`model` 取值见枚举 `ModelChoice`（如 `deepseek-ai/DeepSeek-V3` 等）。
@@ -53,7 +60,34 @@
 3. `documents_versions.sql`
 4. `migration.sql`
 5. `api_logs.sql`
-6. `personal_statement_profile.sql`
+6. `personal_statement_profile.sql`（包含 `user_id` 外键、`name` 字段、按 `user_id` 与 `created_at` 建索引）
+
+### 使用示例
+
+生成并写入用户画像：
+```
+POST /personal-statement-profile/
+Content-Type: application/json
+{
+  "user_id": "00000000-0000-0000-0000-000000000000",
+  "text": "...含个人经历/目标的 Markdown...",
+  "model": "deepseek-ai/DeepSeek-V3"
+}
+```
+成功时响应：
+```
+{ "name": "张三", "profile_md": "..." }
+```
+
+查询用户画像：
+```
+POST /api/personal-statement-profiles
+Content-Type: application/json
+{
+  "user_id": "00000000-0000-0000-0000-000000000000",
+  "name": "张三"
+}
+```
 
 ### 模型与负载均衡
 - 支持多提供商多密钥的负载均衡（轮询 + RPM/TPM 限速 + 熔断）：
