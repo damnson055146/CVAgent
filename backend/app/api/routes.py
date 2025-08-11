@@ -7,7 +7,7 @@ from typing import Dict, Any
 from datetime import datetime
 import uuid
 
-from app.models.schemas import TextInput, NewResumeProfile, PromptTextInput, ModelChoice, JsonInputWithModel
+from app.models.schemas import TextInput, NewResumeProfile, PromptTextInput, JsonInputWithModel
 from app.models import user_models
 from app.services import siliconflow_client as sf_client
 from app.models.api_log_models import APILog
@@ -35,7 +35,7 @@ def _ensure_user_exists(db: Session, user_id: UUID) -> None:
 @router.post("/parse-resume/")
 async def parse_resume(
     file: UploadFile = File(...),
-    model: ModelChoice = ModelChoice.deepseek_v3,
+    model: str = Form(...),
     user_id: UUID = Form(...),
     db: Session = Depends(get_db),
 ):
@@ -48,7 +48,7 @@ async def parse_resume(
         if not extracted_text.strip():
             raise ValueError("无法从PDF中提取任何文本。")
 
-        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._PARSE_RESUME_PROMPT, extracted_text, model.value, True)
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._PARSE_RESUME_PROMPT, extracted_text, model, True)
         result = content
         if "error" in result:
             raise HTTPException(status_code=502, detail=result["error"])
@@ -84,7 +84,7 @@ async def parse_resume(
 @router.post("/parse-resume-text/")
 async def parse_resume_text(input_data: TextInput, db: Session = Depends(get_db)):
     _ensure_user_exists(db, input_data.user_id)
-    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._PARSE_RESUME_PROMPT, input_data.text, input_data.model.value, True)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._PARSE_RESUME_PROMPT, input_data.text, input_data.model, True)
     result = content
     if "error" in result:
         raise HTTPException(status_code=502, detail=result)
@@ -107,7 +107,7 @@ async def parse_resume_text(input_data: TextInput, db: Session = Depends(get_db)
 @router.post("/optimize-text/")
 async def rewrite_text(input_data: TextInput, db: Session = Depends(get_db)):
     _ensure_user_exists(db, input_data.user_id)
-    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._REWRITE_TEXT_PROMPT, input_data.text, input_data.model.value, False)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._REWRITE_TEXT_PROMPT, input_data.text, input_data.model, False)
     db.add(APILog(
         user_id=input_data.user_id,
         api_name="optimize_text",
@@ -126,7 +126,7 @@ async def rewrite_text(input_data: TextInput, db: Session = Depends(get_db)):
 @router.post("/expand-text/")
 async def expand_text(input_data: TextInput, db: Session = Depends(get_db)):
     _ensure_user_exists(db, input_data.user_id)
-    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._EXPAND_TEXT_PROMPT, input_data.text, input_data.model.value, False)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._EXPAND_TEXT_PROMPT, input_data.text, input_data.model, False)
     db.add(APILog(
         user_id=input_data.user_id,
         api_name="expand_text",
@@ -145,7 +145,7 @@ async def expand_text(input_data: TextInput, db: Session = Depends(get_db)):
 @router.post("/contract-text/")
 async def contract_text(input_data: TextInput, db: Session = Depends(get_db)):
     _ensure_user_exists(db, input_data.user_id)
-    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._CONTRACT_TEXT_PROMPT, input_data.text, input_data.model.value, False)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._CONTRACT_TEXT_PROMPT, input_data.text, input_data.model, False)
     db.add(APILog(
         user_id=input_data.user_id,
         api_name="contract_text",
@@ -165,7 +165,7 @@ async def contract_text(input_data: TextInput, db: Session = Depends(get_db)):
 async def process_json_to_text(input_data: JsonInputWithModel, db: Session = Depends(get_db)):
     _ensure_user_exists(db, input_data.user_id)
     json_as_text = json.dumps(input_data.data, indent=2, ensure_ascii=False)
-    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._EVALUATE_RESUME_PROMPT, json_as_text, input_data.model.value, False)
+    content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._EVALUATE_RESUME_PROMPT, json_as_text, input_data.model, False)
     db.add(APILog(
         user_id=input_data.user_id,
         api_name="evaluate_resume",
@@ -188,7 +188,7 @@ async def generate_with_prompt(input_data: PromptTextInput, db: Session = Depend
     接收文本和自定义提示，调用SiliconFlow生成文本，并以指定格式返回。
     """
     try:
-        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, input_data.prompt, input_data.text, input_data.model.value, False)
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, input_data.prompt, input_data.text, input_data.model, False)
         db.add(APILog(
             user_id=input_data.user_id,
             api_name="modified_text_prompt",
@@ -213,7 +213,7 @@ async def generate_statement(input_data: TextInput, db: Session = Depends(get_db
     接收包含个人陈述相关信息的文本，调用 SiliconFlow 生成个人陈述。
     """
     try:
-        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._GENERATE_STATEMENT_PROMPT, input_data.text, input_data.model.value, True)
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._GENERATE_STATEMENT_PROMPT, input_data.text, input_data.model, True)
         statement_dict = content
         if "error" in statement_dict:
             raise HTTPException(status_code=502, detail=statement_dict["error"])
@@ -243,7 +243,7 @@ async def generate_recommendation(input_data: TextInput, db: Session = Depends(g
     接收生成推荐信所需的信息文本，调用Dify并返回其生成的JSON结构。
     """
     try:
-        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._GENERATE_RECOMMENDATION_PROMPT, input_data.text, input_data.model.value, True)
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._GENERATE_RECOMMENDATION_PROMPT, input_data.text, input_data.model, True)
         recommendation_json = content
         if "error" in recommendation_json:
             raise HTTPException(status_code=502, detail=recommendation_json["error"])
@@ -271,7 +271,7 @@ async def name_document(input_data: TextInput, db: Session = Depends(get_db)):
     接收Markdown格式的文本，调用Dify为其生成一个合适的标题。
     """
     try:
-        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._NAME_DOCUMENT_PROMPT, input_data.text, input_data.model.value, False)
+        content, meta = await run_in_threadpool(sf_client._call_siliconflow_with_meta, sf_client._NAME_DOCUMENT_PROMPT, input_data.text, input_data.model, False)
         db.add(APILog(
             user_id=input_data.user_id,
             api_name="name_document",
@@ -307,7 +307,7 @@ async def personal_statement_profile(input_data: TextInput, db: Session = Depend
             sf_client._call_siliconflow_with_meta,
             sf_client._GENERATE_PS_PROFILE_PROMPT,
             input_data.text,
-            input_data.model.value,
+            input_data.model,
             False
         )
 
@@ -316,7 +316,7 @@ async def personal_statement_profile(input_data: TextInput, db: Session = Depend
             sf_client._call_siliconflow_with_meta,
             sf_client._EXTRACT_NAME_PROMPT,
             input_data.text,
-            input_data.model.value,
+            input_data.model,
             False
         )
         extracted_name = (name_text or "").strip()

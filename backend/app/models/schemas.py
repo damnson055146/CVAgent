@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List, Dict, Any
+import os
 from datetime import datetime
 import uuid
 
@@ -40,26 +41,24 @@ class UserInDB(BaseModel):
         from_attributes = True
 
 # --- 通用输入模型 ---
-class ModelChoice(str, Enum):
-    deepseek_v3 = "deepseek-ai/DeepSeek-V3"
-    qwen_7b = "Qwen/Qwen2.5-7B-Instruct"
-    glm4_9b = "THUDM/glm-4-9b-chat"
+# 允许自由传入任意模型字符串（来自 SiliconFlow 或 OpenAI），默认从环境变量读取
+_DEFAULT_MODEL = os.getenv("SILICONFLOW_MODEL", "deepseek-ai/DeepSeek-V3")
 
 class TextInput(BaseModel):
     user_id: UUID
     text: str = Field(..., min_length=1)
-    model: ModelChoice = Field(ModelChoice.deepseek_v3, description="要使用的模型标识")
+    model: str = Field(_DEFAULT_MODEL, description="要使用的模型标识（任意可用模型ID）")
 
 # 新增：用于接收文本和Prompt的模型
 class PromptTextInput(BaseModel):
     user_id: UUID
     text: str
     prompt: str
-    model: ModelChoice = Field(ModelChoice.deepseek_v3, description="要使用的模型标识")
+    model: str = Field(_DEFAULT_MODEL, description="要使用的模型标识（任意可用模型ID）")
 
 class JsonInputWithModel(BaseModel):
     user_id: UUID
-    model: ModelChoice = Field(ModelChoice.deepseek_v3, description="要使用的模型标识")
+    model: str = Field(_DEFAULT_MODEL, description="要使用的模型标识（任意可用模型ID）")
     data: Dict[str, Any]
 
 
