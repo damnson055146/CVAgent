@@ -24,7 +24,13 @@ const handleResponse = async (res) => {
   return res.json();
 };
 
-export const generateRec = async (inputText) => {
+export const generateRec = async (inputText, options = {}) => {
+  const {
+    wordCount = 250,
+    originalText = '',
+    customHighlights = ''
+  } = options;
+
   try {
     const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.REC.GENERATE}`, {
       method: 'POST',
@@ -32,7 +38,10 @@ export const generateRec = async (inputText) => {
       body: JSON.stringify({ 
         user_id: getUserId(), 
         text: inputText, 
-        model: getDefaultModel() 
+        model: getDefaultModel(),
+        word_count: wordCount,
+        original_text: originalText,
+        custom_highlights: customHighlights
       }),
     });
     return handleResponse(res);

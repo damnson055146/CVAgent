@@ -98,23 +98,7 @@ export default function Editbar({
         </div>
       </div>
 
-      {/* 行距设置 */}
-      <div className="relative flex-shrink-0">
-        <select
-          value={config.lineHeight}
-          onChange={(e) => setConfig({ ...config, lineHeight: Number(e.target.value) })}
-          className="appearance-none border border-gray-300 dark:border-gray-600 rounded-md pl-3 pr-8 py-1 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-20 text-gray-700 dark:text-gray-200"
-        >
-          {[0.8, 1.0, 1.2, 1.5, 1.8, 2.0, 2.5, 3.0].map(lineHeight => (
-            <option key={lineHeight} value={lineHeight}>{lineHeight}</option>
-          ))}
-        </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
-          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-          </svg>
-        </div>
-      </div>
+
 
       {/* 撤销/重做按钮 */}
       <div className="flex items-center gap-1 flex-shrink-0">
@@ -220,6 +204,73 @@ export default function Editbar({
         >
           <AlignRight size={25} />
         </Button>
+      </div>
+
+      {/* 分隔线 */}
+      <div className="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-2 flex-shrink-0"></div>
+
+      {/* MD标题控制 */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <Button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('insert-heading', { detail: { level: 1 } }));
+          }}
+          type="ghost"
+          size="sm"
+          title="插入一级标题 (Ctrl+1)"
+          aria-label="H1"
+          className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center font-bold text-lg"
+        >
+          H1
+        </Button>
+        <Button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('insert-heading', { detail: { level: 2 } }));
+          }}
+          type="ghost"
+          size="sm"
+          title="插入二级标题 (Ctrl+2)"
+          aria-label="H2"
+          className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center font-bold text-base"
+        >
+          H2
+        </Button>
+        <Button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('insert-heading', { detail: { level: 3 } }));
+          }}
+          type="ghost"
+          size="sm"
+          title="插入三级标题 (Ctrl+3)"
+          aria-label="H3"
+          className="hover:bg-gray-200 w-8 h-8 flex items-center justify-center font-bold text-sm"
+        >
+          H3
+        </Button>
+      </div>
+
+      {/* 分隔线 */}
+      <div className="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-2 flex-shrink-0"></div>
+
+      {/* 全局行距控制 */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">全局行距:</span>
+        <div className="relative flex-shrink-0">
+          <select
+            value={config.lineHeight}
+            onChange={(e) => setConfig({ ...config, lineHeight: Number(e.target.value) })}
+            className="appearance-none border border-gray-300 dark:border-gray-600 rounded-md pl-2 pr-6 py-1 text-xs bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-16 text-gray-700 dark:text-gray-200"
+          >
+            {[0.8, 1.0, 1.2, 1.5, 1.8, 2.0, 2.5, 3.0].map(lineHeight => (
+              <option key={lineHeight} value={lineHeight}>{lineHeight}</option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-gray-700 dark:text-gray-300">
+            <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+            </svg>
+          </div>
+        </div>
       </div>
 
       {/* 分隔线 */}

@@ -941,10 +941,56 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
     window.addEventListener('align-center-selected-text', handleAlignmentEvent);
     window.addEventListener('align-right-selected-text', handleAlignmentEvent);
     
+    // 添加标题插入事件监听器
+    const handleHeadingEvent = (event) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      
+      const { level } = event.detail;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selectedText = text.substring(start, end);
+      
+      // 获取当前行的开始位置
+      const beforeCursor = text.substring(0, start);
+      const lineStart = beforeCursor.lastIndexOf('\n') + 1;
+      const currentLine = text.substring(lineStart, start);
+      
+      // 如果当前行已经有标题标记，先移除
+      let newText = text;
+      let newCursorPos = start;
+      
+      if (currentLine.match(/^#{1,6}\s/)) {
+        // 移除现有标题标记
+        const titleMatch = currentLine.match(/^(#{1,6})\s(.*)/);
+        if (titleMatch) {
+          newText = text.substring(0, lineStart) + titleMatch[2] + text.substring(start);
+          newCursorPos = lineStart + titleMatch[2].length;
+        }
+      } else {
+        // 添加标题标记
+        const headingPrefix = '#'.repeat(level) + ' ';
+        newText = text.substring(0, lineStart) + headingPrefix + currentLine + text.substring(start);
+        newCursorPos = lineStart + headingPrefix.length + currentLine.length;
+      }
+      
+      setText(newText);
+      onUpdate?.(newText);
+      
+      // 设置光标位置
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    };
+    
+    window.addEventListener('insert-heading', handleHeadingEvent);
+    
     return () => {
       window.removeEventListener('align-left-selected-text', handleAlignmentEvent);
       window.removeEventListener('align-center-selected-text', handleAlignmentEvent);
       window.removeEventListener('align-right-selected-text', handleAlignmentEvent);
+      window.removeEventListener('insert-heading', handleHeadingEvent);
     };
   }, [text, onUpdate]);
 
@@ -968,6 +1014,95 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
     return () => textarea.removeEventListener('wheel', handler);
   }, []);
 
+  // 添加键盘快捷键支持
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const handleKeyDown = (e) => {
+      // Ctrl+1, Ctrl+2, Ctrl+3 插入标题
+      if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+        if (e.key >= '1' && e.key <= '3') {
+          e.preventDefault();
+          const level = parseInt(e.key);
+          window.dispatchEvent(new CustomEvent('insert-heading', { detail: { level } }));
+        }
+      }
+    };
+    
+    textarea.addEventListener('keydown', handleKeyDown);
+    return () => textarea.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // 渲染即时预览文本
+  const renderInstantPreview = () => {
+    if (!text) return null;
+    
+    const lines = text.split('\n');
+    const cursorPosition = textareaRef.current?.selectionStart || 0;
+    const cursorLine = text.substring(0, cursorPosition).split('\n').length - 1;
+    
+    return lines.map((line, lineIndex) => {
+      const isCurrentLine = lineIndex === cursorLine;
+      
+      // 计算当前行的选择状态
+      const lineStartPos = text.split('\n').slice(0, lineIndex).join('\n').length + (lineIndex > 0 ? 1 : 0);
+      const lineEndPos = lineStartPos + line.length;
+      const isSelected = shouldShowBlueHighlight && 
+        selection.start < lineEndPos && selection.end > lineStartPos;
+      
+      // 解析Markdown格式
+      let displayText = line;
+      let isHeading = false;
+      let headingLevel = 0;
+      
+      // 标题格式 - 只处理行首的标题
+      if (line.match(/^#{1,6}\s/)) {
+        const match = line.match(/^(#{1,6})\s(.*)/);
+        if (match) {
+          headingLevel = match[1].length;
+          displayText = match[2]; // 只显示标题内容，不显示#符号
+          isHeading = true;
+        }
+      }
+      
+      // 应用样式
+      let style = {
+        color: isDarkMode ? 'white' : 'black',
+        fontSize: isHeading ? (headingLevel === 1 ? '1.5rem' : headingLevel === 2 ? '1.25rem' : '1.125rem') : 'inherit',
+        fontWeight: isHeading ? 'bold' : 'normal',
+        marginBottom: isHeading ? '0.5rem' : '0',
+      };
+      
+      return (
+        <div key={lineIndex} style={{ 
+          backgroundColor: isCurrentLine ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+          borderRadius: isCurrentLine ? '4px' : '0',
+          padding: isCurrentLine ? '2px 4px' : '0',
+        }}>
+          {isSelected ? (
+            <span 
+              ref={selectionSpanRef} 
+              style={{
+                ...style,
+                backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                borderRadius: '2px',
+                padding: '1px 2px',
+              }}
+            >
+              {displayText}
+            </span>
+          ) : (
+            <span style={style}>
+              {displayText}
+            </span>
+          )}
+          {lineIndex < lines.length - 1 && '\n'}
+        </div>
+      );
+    });
+  };
+
   // 调试信息
   console.log('暗色模式状态:', {
     isDarkMode,
@@ -979,54 +1114,39 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
 
   return (
     <div ref={containerRef} className="relative h-full bg-white dark:bg-gray-900 text-black dark:text-white">
+      {/* 即时预览层 */}
       <div 
         ref={overlayRef}
         className="absolute inset-0 p-4 pointer-events-none text-sm leading-relaxed font-mono z-5 whitespace-pre-wrap overflow-hidden"
-        style={{ wordBreak: 'break-word' }}
+        style={{ 
+          wordBreak: 'break-word',
+          fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+          lineHeight: '1.5',
+        }}
         onScroll={handleTextareaScroll}
       >
-        {/* 只在显示高光时渲染overlay文本 */}
-        {shouldShowBlueHighlight && (
-          <>
-            <span style={{ color: isDarkMode ? 'white' : 'black' }}>{text.slice(0, selection.start)}</span>
-            <span 
-              ref={selectionSpanRef} 
-              className="bg-blue-200 dark:bg-blue-600 bg-opacity-50 dark:bg-opacity-70 rounded px-0.5 text-black dark:text-white"
-              style={{ 
-                display: 'inline',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word'
-              }}
-            >
-              {selection.text}
-            </span>
-            <span style={{ color: isDarkMode ? 'white' : 'black' }}>{text.slice(selection.end)}</span>
-          </>
-        )}
+        {/* 渲染即时预览文本 */}
+        {renderInstantPreview()}
       </div>
+      
+      {/* 编辑层 */}
       <textarea
         ref={textareaRef}
         value={text}
         onChange={handleChange}
         onScroll={handleTextareaScroll}
-        className={`absolute inset-0 w-full h-full p-4 resize-none outline-none text-sm leading-relaxed font-mono border-none focus:ring-0 z-10 bg-transparent dark:bg-gray-900 ${
+        className={`absolute inset-0 w-full h-full p-4 resize-none outline-none text-sm leading-relaxed font-mono border-none focus:ring-0 z-10 ${
           isDarkMode ? 'selection-dark' : 'selection-light'
         }`}
         placeholder="在这里编辑 Markdown..."
         style={{ 
           caretColor: isDarkMode ? 'white' : 'black',
-          color: isDarkMode ? 'white' : 'black',
+          color: 'transparent', // 始终透明，避免与预览层重叠
+          backgroundColor: 'transparent',
           userSelect: 'auto',
-          // 当显示高光时，让 textarea 的文字透明，避免重影
-          ...(shouldShowBlueHighlight && {
-            color: 'transparent',
-            caretColor: isDarkMode ? 'white' : 'black', // 保持光标可见
-          })
+          fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+          lineHeight: '1.5',
         }}
-        // 移除 onFocus 事件，这是导致滚动的主要原因
-        // onFocus={(e) => {
-        //   e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        // }}
       />
       {(showToolbar || showPromptInput) && (
         <div className="selection-toolbar">
@@ -1060,6 +1180,8 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
           </div>
         </div>
       )}
+
+
     </div>
   );
 });
