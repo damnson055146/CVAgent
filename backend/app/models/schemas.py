@@ -45,19 +45,22 @@ class UserInDB(BaseModel):
 _DEFAULT_MODEL = os.getenv("SILICONFLOW_MODEL", "deepseek-ai/DeepSeek-V3")
 
 class TextInput(BaseModel):
-    user_id: UUID
+    # 基于 access_token 鉴权后，user_id 不再必填，仅为兼容旧客户端保留
+    user_id: Optional[UUID] = None
     text: str = Field(..., min_length=1)
     model: str = Field(_DEFAULT_MODEL, description="要使用的模型标识（任意可用模型ID）")
 
 # 新增：用于接收文本和Prompt的模型
 class PromptTextInput(BaseModel):
-    user_id: UUID
+    # 基于 access_token 鉴权后，user_id 不再必填，仅为兼容旧客户端保留
+    user_id: Optional[UUID] = None
     text: str
     prompt: str
     model: str = Field(_DEFAULT_MODEL, description="要使用的模型标识（任意可用模型ID）")
 
 class JsonInputWithModel(BaseModel):
-    user_id: UUID
+    # 基于 access_token 鉴权后，user_id 不再必填，仅为兼容旧客户端保留
+    user_id: Optional[UUID] = None
     model: str = Field(_DEFAULT_MODEL, description="要使用的模型标识（任意可用模型ID）")
     data: Dict[str, Any]
 
@@ -123,7 +126,8 @@ class DocumentTypeEnum(str, Enum):
 
 class UserDocQuery(BaseModel):
     """用于需要用户ID的请求体的模式。"""
-    user_id: uuid.UUID
+    # 基于 access_token 鉴权后，user_id 不再必填，仅为兼容旧客户端保留
+    user_id: Optional[uuid.UUID] = None
 
 # --- 新增 Schema 用于历史记录列表 ---
 class DocumentVersionHistoryItem(BaseModel):
@@ -159,7 +163,8 @@ class TokenResponse(BaseModel):
 
 # 请求体
 class DocumentSave(BaseModel):
-    user_id: UUID
+    # 基于 access_token 鉴权后，user_id 不再必填，仅为兼容旧客户端保留
+    user_id: Optional[UUID] = None
     content_md: str = Field(..., min_length=1)
     user_profile: Optional[str] = Field("", description="前端传入的用户Profile文本")
 

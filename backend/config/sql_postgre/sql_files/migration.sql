@@ -84,4 +84,7 @@ CREATE POLICY doc_versions_owner_policy
     )
   );
 
+-- Drop unique index on (user_id, type, lower(title)) to allow duplicate titles for active documents
+DROP INDEX IF EXISTS ux_documents_title_active;
+
 COMMIT;

@@ -49,7 +49,6 @@ lerna-debug.log*
 
 # Backend env files
 backend/.env
-backend/env.example
 
 # IDE
 .vscode/
