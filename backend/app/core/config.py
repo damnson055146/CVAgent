@@ -32,6 +32,28 @@ class Settings(BaseModel):
         'naming': os.getenv("DIFY_API_KEY_NAMING"),
     }
 
+    # 头脑风暴服务配置
+    # OpenAI配置
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4")
+    
+    # SiliconFlow配置
+    SILICONFLOW_API_KEY: str = os.getenv("SILICONFLOW_API_KEY", "")
+    SILICONFLOW_BASE_URL: str = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+    SILICONFLOW_MODEL: str = os.getenv("SILICONFLOW_MODEL", "deepseek-ai/DeepSeek-V3")
+    
+    # Redis缓存配置
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_TTL: int = int(os.getenv("REDIS_TTL", "3600"))  # 1小时
+    
+    # 缓存配置
+    SOFT_CACHE_SIZE: int = int(os.getenv("SOFT_CACHE_SIZE", "1000"))
+    HARD_CACHE_TTL: int = int(os.getenv("HARD_CACHE_TTL", "86400"))  # 24小时
+    
+    # 用户画像配置
+    USER_PROFILE_ALIGNMENT_ENABLED: bool = os.getenv("USER_PROFILE_ALIGNMENT_ENABLED", "true").lower() == "true"
+
     # 校验所有必要环境变量是否已设置
     def __init__(self, **data):
         super().__init__(**data)

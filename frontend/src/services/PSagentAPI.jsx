@@ -53,13 +53,10 @@ export const generatePersonalStatement = async (inputText) => {
 // 头脑风暴相关API
 export const generateBrainstormQuestions = async (params) => {
   try {
-    // 头脑风暴API是独立服务，使用完整URL
-    const brainstormUrl = API_ENDPOINTS.PS.BRAINSTORM;
-    const res = await fetch(brainstormUrl, {
+    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PS.BRAINSTORM}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
-        user_id: getUserId(),
         cv_content: params.cvContent || '',
         manual_info: params.manualInfo || {},
         prompt_template: params.promptTemplate || '',

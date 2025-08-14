@@ -1,46 +1,40 @@
-
+# 使用Python 3.11官方镜像作为基础镜像
 FROM python:3.11-slim
 
 # 设置工作目录
 WORKDIR /app
 
 # 设置环境变量
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 # 安装系统依赖
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-         build-essential \
-         libpq-dev \
-         gcc \
-         postgresql-client \
-          curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 拷贝并安装 Python 依赖
+# 复制requirements.txt
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
 
-# 拷贝应用代码
-COPY main.py .
-COPY app/ ./app
-# 将示例环境复制为容器内默认 .env（实际部署时由 docker-compose 的 env_file/environment 覆盖）
-COPY env.example .env
+# 安装Python依赖
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 等待数据库启动的脚本
-COPY wait-for-db.sh .
-RUN chmod +x wait-for-db.sh
+# 复制应用代码
+COPY . .
 
-# 创建非root用户（可选，提高安全性）
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+# 创建非root用户
+RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app
+USER app
 
-# 暴露容器内端口
+# 暴露端口
 EXPOSE 8699
 
-# 启动命令（生产不建议 --reload）
-ENTRYPOINT ["/bin/sh", "-lc"]
-CMD ["./wait-for-db.sh uvicorn main:app --host 0.0.0.0 --port 8699"]
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8699/health || exit 1
+
+# 启动命令
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8699"]

@@ -1,108 +1,129 @@
-version: "3.8"
+version: '3.8'
 
 services:
   # PostgreSQL数据库
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: cvagent_postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-aiagent}
+      POSTGRES_DB: ${POSTGRES_DB:-cvagent}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./config/sql_postgre:/docker-entrypoint-initdb.d
-    networks:
-      - cv-agent-network
-    restart: unless-stopped
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - cvagent_network
 
-  # 后端服务
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    environment:
-      # Database
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://postgres:postgres@postgres:5432/aiagent}
-      DATABASE_URL_ASYNC: ${DATABASE_URL_ASYNC:-postgresql+asyncpg://postgres:postgres@postgres:5432/aiagent}
-
-      # App
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-prod}
-      ALGORITHM: ${ALGORITHM:-HS256}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
-      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      ORIGINS: ${ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-
-      # SiliconFlow keys & limits
-      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
-      SILICONFLOW_API_KEY_2: ${SILICONFLOW_API_KEY_2:-}
-      SILICONFLOW_KEY1_RPM: ${SILICONFLOW_KEY1_RPM:-60}
-      SILICONFLOW_KEY1_TPM: ${SILICONFLOW_KEY1_TPM:-90000}
-      SILICONFLOW_KEY2_RPM: ${SILICONFLOW_KEY2_RPM:-60}
-      SILICONFLOW_KEY2_TPM: ${SILICONFLOW_KEY2_TPM:-90000}
-      SILICONFLOW_ESTIMATED_TOKENS_PER_CALL: ${SILICONFLOW_ESTIMATED_TOKENS_PER_CALL:-1500}
-      SILICONFLOW_RETRY_MAX_ATTEMPTS: ${SILICONFLOW_RETRY_MAX_ATTEMPTS:-3}
-      SILICONFLOW_RETRY_BASE_DELAY_MS: ${SILICONFLOW_RETRY_BASE_DELAY_MS:-200}
-      SILICONFLOW_CIRCUIT_BREAK_THRESHOLD: ${SILICONFLOW_CIRCUIT_BREAK_THRESHOLD:-3}
-      SILICONFLOW_CIRCUIT_BREAK_SECONDS: ${SILICONFLOW_CIRCUIT_BREAK_SECONDS:-60}
-      SILICONFLOW_MODEL: ${SILICONFLOW_MODEL:-deepseek-ai/DeepSeek-V3}
-      SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL:-https://api.siliconflow.cn/v1}
-
-      # OpenAI keys & limits (可留空)
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_API_KEY_2: ${OPENAI_API_KEY_2:-}
-      OPENAI_KEY1_RPM: ${OPENAI_KEY1_RPM:-60}
-      OPENAI_KEY1_TPM: ${OPENAI_KEY1_TPM:-90000}
-      OPENAI_KEY2_RPM: ${OPENAI_KEY2_RPM:-60}
-      OPENAI_KEY2_TPM: ${OPENAI_KEY2_TPM:-90000}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: cvagent_redis
     ports:
-      - "8699:8699"
+      - "6379:6379"
     volumes:
-      - ./app:/app/app
-      - ./main.py:/app/main.py
-      - ./requirements.txt:/app/requirements.txt
-      - ./wait-for-db.sh:/app/wait-for-db.sh
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cvagent_network
+
+  # 数据库初始化服务
+  db-init:
+    image: postgres:15-alpine
+    container_name: cvagent_db_init
     depends_on:
       postgres:
         condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-cvagent}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./init-db.sh:/init-db.sh
+      - ./config/sql_postgre:/app/config/sql_postgre
+    command: ["/bin/bash", "/init-db.sh"]
     networks:
-      - cv-agent-network
-    restart: unless-stopped
+      - cvagent_network
+
+  # 后端API服务
+  backend:
+    build: .
+    container_name: cvagent_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      # 数据库配置
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-cvagent}
+      
+      # Redis配置
+      REDIS_URL: redis://redis:6379/0
+      
+      # API密钥配置
+      API_KEY: ${API_KEY}
+      
+      # Dify配置
+      DIFY_API_URL: ${DIFY_API_URL}
+      DIFY_API_KEY_PARSE: ${DIFY_API_KEY_PARSE}
+      DIFY_API_KEY_REWRITE: ${DIFY_API_KEY_REWRITE}
+      DIFY_API_KEY_EXPAND: ${DIFY_API_KEY_EXPAND}
+      DIFY_API_KEY_CONTRACT: ${DIFY_API_KEY_CONTRACT}
+      DIFY_API_KEY_PROCESS_TEXT: ${DIFY_API_KEY_PROCESS_TEXT}
+      DIFY_API_KEY_PERSONAL_STATEMENT: ${DIFY_API_KEY_PERSONAL_STATEMENT}
+      DIFY_API_KEY_RECOMMENDATION: ${DIFY_API_KEY_RECOMMENDATION}
+      DIFY_API_KEY_PROMPT_BASED: ${DIFY_API_KEY_PROMPT_BASED}
+      DIFY_API_KEY_NAMING: ${DIFY_API_KEY_NAMING}
+      
+      # AI服务配置
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY}
+      SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL}
+      SILICONFLOW_MODEL: ${SILICONFLOW_MODEL}
+      
+      # 缓存配置
+      SOFT_CACHE_SIZE: ${SOFT_CACHE_SIZE:-1000}
+      HARD_CACHE_TTL: ${HARD_CACHE_TTL:-86400}
+      REDIS_TTL: ${REDIS_TTL:-3600}
+      
+      # 用户画像配置
+      USER_PROFILE_ALIGNMENT_ENABLED: ${USER_PROFILE_ALIGNMENT_ENABLED:-true}
+    ports:
+      - "8699:8699"
+    volumes:
+      - ./logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8699/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # 前端服务 - 暂时注释掉
-  # frontend:
-  #   build:
-  #     context: ../frontend
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     VITE_API_BASE_URL: http://localhost:8700
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     backend:
-  #       condition: service_healthy
-  #   networks:
-  #     - cv-agent-network
-  #   restart: unless-stopped
+      start_period: 40s
+    networks:
+      - cvagent_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
-  cv-agent-network:
+  cvagent_network:
     driver: bridge

@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from app.api.routes import router
 from app.api.auth_routes import router as auth_router
+from app.api.brainstorm_routes import router as brainstorm_router
 # from app.api.document_routes import router as document_router
 # 先导入document_models以避免循环导入问题
 from app.models import document_models
@@ -20,6 +21,7 @@ from app.models import user_models
 from app.models.api_log_models import APILog
 from app.database import get_db, Base, engine
 from app.models import schemas
+from app.core.cache import init_cache
  
 from app.services.auth import get_current_user_flexible
 
@@ -49,6 +51,7 @@ app.add_middleware(
 # 包含路由
 app.include_router(router)
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(brainstorm_router, prefix="/api/brainstorm", tags=["brainstorm"])
 # app.include_router(document_router, prefix="/documents", tags=["documents"])
 
 # 创建数据库表 - 注释掉，因为已经用SQL脚本创建了
@@ -64,6 +67,11 @@ async def root():
 async def health_check():
     """健康检查端点"""
     return {"status": "healthy", "service": "CV Agent API"}
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化缓存"""
+    await init_cache()
 
 
 #按类型创建文档

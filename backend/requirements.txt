@@ -19,3 +19,4 @@ sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
 python-multipart==0.0.9
 asyncpg==0.29.0
+redis==5.0.1
