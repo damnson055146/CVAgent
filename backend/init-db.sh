@@ -16,6 +16,9 @@ done
 
 echo "✅ PostgreSQL已启动"
 
+# 设置密码环境变量
+export PGPASSWORD=$POSTGRES_PASSWORD
+
 # 创建数据库（如果不存在）
 echo "📦 创建数据库..."
 psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d postgres -c "SELECT 1 FROM pg_database WHERE datname = '$POSTGRES_DB'" | grep -q 1 || psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d postgres -c "CREATE DATABASE $POSTGRES_DB"

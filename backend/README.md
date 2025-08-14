@@ -162,6 +162,161 @@
 
 说明：`model` 取值参考模型列表接口返回的可用模型（如 `deepseek-ai/DeepSeek-V3` 等）。
 
+### 头脑风暴与对话（brainstorm_routes.py）
+- POST `/api/brainstorm/questions` body: { cv_content?, manual_info?, prompt_template?, model, selected_text?, user_profile? }
+- POST `/api/brainstorm/chat` body: { session_id?, message, model }
+- GET `/api/brainstorm/sessions` → 返回用户的所有会话列表
+- GET `/api/brainstorm/sessions/{session_id}/history` → 返回指定会话的对话历史
+- DELETE `/api/brainstorm/sessions/{session_id}` → 删除指定会话
+- GET `/api/brainstorm/cache/stats` → 返回缓存统计信息
+- DELETE `/api/brainstorm/cache/clear` → 清空软缓存
+- GET `/api/brainstorm/sessions/stats` → 返回会话统计信息
+
+#### 详细接口说明
+
+1) 生成头脑风暴问题
+- POST `/api/brainstorm/questions`
+- 入参：
+```
+{
+  "cv_content": "简历内容（可选）",
+  "manual_info": {"key": "value"}, // 手动输入信息（可选）
+  "prompt_template": "自定义提示模板（可选）",
+  "model": "deepseek-ai/DeepSeek-V3",
+  "selected_text": "选中的文本（可选）",
+  "user_profile": "用户画像信息（可选）"
+}
+```
+- 出参：
+```
+{
+  "questions": [
+    {
+      "academic": [
+        {
+          "question": "你的学术背景如何？",
+          "category": "academic",
+          "priority": 1,
+          "context": "基于简历中的教育经历"
+        }
+      ]
+    },
+    {
+      "research": [
+        {
+          "question": "你的研究经历是什么？",
+          "category": "research", 
+          "priority": 2,
+          "context": "基于简历中的研究项目"
+        }
+      ]
+    }
+  ],
+  "user_profile_alignment": "用户画像对齐信息",
+  "cache_hit": false,
+  "processing_time": 1.23
+}
+```
+
+2) 与AI助手对话
+- POST `/api/brainstorm/chat`
+- 入参：
+```
+{
+  "session_id": "会话ID（可选，不提供则创建新会话）",
+  "message": "用户消息",
+  "model": "deepseek-ai/DeepSeek-V3"
+}
+```
+- 出参：
+```
+{
+  "session_id": "会话ID",
+  "message": "AI回复内容",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "用户消息",
+      "timestamp": "2024-01-01T12:00:00"
+    },
+    {
+      "role": "assistant", 
+      "content": "AI回复",
+      "timestamp": "2024-01-01T12:00:01"
+    }
+  ],
+  "context_summary": "上下文摘要",
+  "processing_time": 0.85
+}
+```
+
+3) 获取用户会话列表
+- GET `/api/brainstorm/sessions`
+- 出参：
+```
+[
+  {
+    "session_id": "会话ID",
+    "created_at": "2024-01-01T12:00:00",
+    "last_activity": "2024-01-01T12:30:00", 
+    "message_count": 5,
+    "context_summary": "关于学术背景的讨论"
+  }
+]
+```
+
+4) 获取会话历史
+- GET `/api/brainstorm/sessions/{session_id}/history`
+- 出参：
+```
+[
+  {
+    "role": "user",
+    "content": "用户消息",
+    "timestamp": "2024-01-01T12:00:00"
+  },
+  {
+    "role": "assistant",
+    "content": "AI回复", 
+    "timestamp": "2024-01-01T12:00:01"
+  }
+]
+```
+
+5) 缓存统计
+- GET `/api/brainstorm/cache/stats`
+- 出参：
+```
+{
+  "soft_cache_size": 50,
+  "soft_cache_max_size": 1000,
+  "redis_connected": true,
+  "redis_info": {
+    "version": "7.0.0",
+    "used_memory": "1.2MB"
+  }
+}
+```
+
+6) 会话统计
+- GET `/api/brainstorm/sessions/stats`
+- 出参：
+```
+{
+  "total_sessions": 100,
+  "total_users": 25,
+  "max_sessions_per_user": 10,
+  "session_cleanup_interval": 3600
+}
+```
+
+#### 头脑风暴功能特性
+- **双重缓存系统**：内存软缓存 + Redis硬缓存，提升响应速度
+- **用户画像对齐**：根据用户画像调整生成的问题和建议
+- **多轮对话**：支持上下文记忆的连续对话
+- **会话管理**：自动创建、维护和清理用户会话
+- **智能分类**：按学术背景、研究经历、领导力、个人特质、职业规划、申请动机等类别组织问题
+
 ### 日志记录（后端透明）
 所有上述业务接口会写入日志表 `api_logs`，记录 `user_id`、请求体、系统 Prompt、模型、token 用量与响应等。
 
@@ -218,6 +373,79 @@ Content-Type: application/json
     "reasons_for_school": "…",
     "conclusion": "…"
   }
+}
+```
+
+生成头脑风暴问题：
+```
+POST /api/brainstorm/questions
+Content-Type: application/json
+{
+  "cv_content": "简历内容...",
+  "manual_info": {"target_position": "软件工程师", "target_company": "Google"},
+  "model": "deepseek-ai/DeepSeek-V3",
+  "user_profile": "用户画像信息..."
+}
+```
+响应：
+```
+{
+  "questions": [
+    {
+      "academic": [
+        {
+          "question": "你的计算机科学背景如何？",
+          "category": "academic",
+          "priority": 1,
+          "context": "基于简历中的教育经历"
+        }
+      ]
+    },
+    {
+      "career": [
+        {
+          "question": "为什么选择Google作为目标公司？",
+          "category": "career",
+          "priority": 2,
+          "context": "基于手动输入的目标公司信息"
+        }
+      ]
+    }
+  ],
+  "user_profile_alignment": "根据你的技术背景，建议重点突出...",
+  "cache_hit": false,
+  "processing_time": 1.23
+}
+```
+
+与AI助手对话：
+```
+POST /api/brainstorm/chat
+Content-Type: application/json
+{
+  "message": "如何更好地展示我的技术能力？",
+  "model": "deepseek-ai/DeepSeek-V3"
+}
+```
+响应：
+```
+{
+  "session_id": "session_12345",
+  "message": "基于你的背景，建议从以下几个方面展示技术能力...",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "如何更好地展示我的技术能力？",
+      "timestamp": "2024-01-01T12:00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "基于你的背景，建议从以下几个方面展示技术能力...",
+      "timestamp": "2024-01-01T12:00:01"
+    }
+  ],
+  "context_summary": "关于技术能力展示的讨论",
+  "processing_time": 0.85
 }
 ```
 
