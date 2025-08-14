@@ -73,7 +73,7 @@ async def generate_brainstorm_questions(request: BrainstormRequest):
         
         # 构建响应
         result = {
-            "questions": questions.get("questions", []),
+            "questions": questions["questions"] if isinstance(questions, dict) and "questions" in questions else questions,
             "user_profile_alignment": user_profile_alignment,
             "meta": meta
         }

@@ -87,7 +87,8 @@ const BrainstormPanel = ({ onClose, onApplyQuestions }) => {
         cvContent: activeTab === 'cv' ? cvContent : '',
         manualInfo: activeTab === 'manual' ? manualInfo : {},
         promptTemplate: promptTemplate,
-        model: 'deepseek-ai/DeepSeek-V3' // 可以根据ModelSelector调整
+        model: 'deepseek-ai/DeepSeek-V3', // 可以根据ModelSelector调整
+        userProfile: '' // 添加用户画像参数
       };
 
       const result = await generateBrainstormQuestions(params);
