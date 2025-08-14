@@ -12,4 +12,6 @@ CREATE EXTENSION IF NOT EXISTS "citext";
 
 \i /docker-entrypoint-initdb.d/sql_files/api_logs.sql
 
+\i /docker-entrypoint-initdb.d/sql_files/personal_statement_profile.sql
+
 SELECT 'Database initialization completed successfully' as status; 

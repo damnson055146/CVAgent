@@ -6,7 +6,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import uuid
 import hashlib
 
@@ -72,7 +73,7 @@ def create_tokens(user: User):
         "token_type": "bearer"
     }
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     """从JWT令牌获取当前用户"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -88,7 +89,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
     
-    user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
     return user
@@ -99,7 +101,7 @@ def get_token_from_cookie(access_token: str = Cookie(None)):
 
 async def get_current_user_from_cookie(
     access_token: str = Depends(get_token_from_cookie),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """从cookie中的令牌获取当前用户"""
     if not access_token:
@@ -122,7 +124,8 @@ async def get_current_user_from_cookie(
             detail="Invalid token"
         )
     
-    user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -137,7 +140,7 @@ def calculate_checksum(content: str) -> str:
 async def get_current_user_flexible(
     token: str = Depends(oauth2_scheme),
     cookie_token: str = Cookie(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """支持Authorization header和cookie两种方式的用户认证"""
     # 优先使用Authorization header

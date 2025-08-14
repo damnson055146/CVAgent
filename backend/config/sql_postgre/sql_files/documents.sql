@@ -18,9 +18,7 @@ CREATE TABLE documents (
 
 CREATE INDEX idx_documents_user           ON documents(user_id);
 CREATE INDEX idx_documents_type           ON documents(type);
-CREATE UNIQUE INDEX ux_documents_title_active
-    ON documents(user_id, type, lower(title))
-    WHERE deleted_at IS NULL;
+-- Removed unique index on (user_id, type, lower(title)) to allow duplicate titles for active documents
 
 
 CREATE OR REPLACE FUNCTION set_updated_at()

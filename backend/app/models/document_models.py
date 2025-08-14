@@ -20,7 +20,8 @@ class Document(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    type = Column(ENUM(DocType), nullable=False, default=DocType.resume)
+    # Use existing PostgreSQL enum type name 'doc_type' to avoid cast mismatch (doc_type vs doctype)
+    type = Column(ENUM(DocType, name="doc_type", create_type=False), nullable=False, default=DocType.resume)
     title = Column(String, nullable=False, default="")
     current_version_id = Column(UUID(as_uuid=True), ForeignKey("document_versions.id", ondelete="SET NULL"), nullable=True)
     doc_metadata = Column("metadata", JSONB, nullable=False, default=dict)  # 使用name参数映射到metadata列
@@ -41,7 +42,8 @@ class DocumentVersion(Base):
     version_number = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     user_profile = Column(Text, nullable=True)  # 新增：用于保存生成该版本时的用户profile
-    content_format = Column(ENUM(ContentFormat), nullable=False, default=ContentFormat.markdown)
+    # DB schema stores content_format as TEXT with a CHECK; align ORM to String to avoid enum type cast issues
+    content_format = Column(String, nullable=False, default=ContentFormat.markdown.value)
     diff_from = Column(UUID(as_uuid=True), ForeignKey("document_versions.id"), nullable=True)
     checksum_sha256 = Column(String, nullable=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)

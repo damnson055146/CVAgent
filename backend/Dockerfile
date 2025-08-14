@@ -15,7 +15,7 @@ RUN apt-get update \
          libpq-dev \
          gcc \
          postgresql-client \
-         curl \
+          curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -27,7 +27,8 @@ RUN pip install --no-cache-dir --upgrade pip \
 # 拷贝应用代码
 COPY main.py .
 COPY app/ ./app
-# 环境变量将通过 docker-compose 的 environment 或 env_file 设置
+# 将示例环境复制为容器内默认 .env（实际部署时由 docker-compose 的 env_file/environment 覆盖）
+COPY env.example .env
 
 # 等待数据库启动的脚本
 COPY wait-for-db.sh .
