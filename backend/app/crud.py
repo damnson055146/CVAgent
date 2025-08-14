@@ -179,14 +179,14 @@ def create_document(
     向documents表插入一行数据，title和current_version_id都设为空。
     """
     # 验证文档类型
-    valid_types = ["resume", "personal_statement", "recommendation"]
+    valid_types = ["resume", "letter", "sop"]
     if doc_type not in valid_types:
         raise ValueError(f"无效的文档类型: {doc_type}。有效类型: {valid_types}")
     
     # 创建新的文档记录
     doc = document_models.Document(
         user_id=user_id,
-        type=doc_type,
+        type=document_models.DocType[doc_type],
         title="",  # 设为空
         current_version_id=None  # 设为空
     )
@@ -208,7 +208,7 @@ def get_user_documents_by_type(
     返回这些行的相关信息。只返回未被软删除的文档。
     """
     # 验证文档类型
-    valid_types = ["resume", "personal_statement", "recommendation"]
+    valid_types = ["resume", "letter", "sop"]
     if doc_type not in valid_types:
         raise ValueError(f"无效的文档类型: {doc_type}。有效类型: {valid_types}")
     
@@ -217,7 +217,7 @@ def get_user_documents_by_type(
         db.query(document_models.Document)
         .filter(
             document_models.Document.user_id == user_id,
-            document_models.Document.type == doc_type,
+            document_models.Document.type == document_models.DocType[doc_type],
             document_models.Document.deleted_at.is_(None)
         )
         .order_by(document_models.Document.created_at.desc())

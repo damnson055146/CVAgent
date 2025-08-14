@@ -332,6 +332,15 @@ export default function Editbar({
               const saveResult = await agentAPI.saveResume(content, userId);
               
               if (saveResult.id) {
+                // 创建版本记录
+                try {
+                  await agentAPI.addResumeVersion(saveResult.id, content);
+                  console.log('版本记录创建成功');
+                } catch (versionError) {
+                  console.error('创建版本记录失败:', versionError);
+                  // 即使版本创建失败，也不影响保存成功
+                }
+                
                 // 生成PDF
                 onSavePDF();
                 

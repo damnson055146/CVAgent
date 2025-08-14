@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, FileText, Edit3, Loader2, ChevronUp, RefreshCw, Brain } from 'lucide-react';
+import { FileText, Edit3, Loader2, ChevronUp, RefreshCw, Brain } from 'lucide-react';
 import Styleswitch from '../comcomponents/icons/Styleswitch';
 import ModelSelector from '../comcomponents/common/ModelSelector';
 import Button from '../comcomponents/common/Button';
@@ -40,6 +40,8 @@ const PSGenerator = () => {
             setIsLoading(false);
         }
     };
+
+
 
     const clearAll = () => {
         setInputText('');
@@ -136,19 +138,28 @@ const PSGenerator = () => {
     };
 
     const copyToClipboard = () => {
-        if (!generatedStatement || !generatedStatement.个人陈述) return;
+        if (!generatedStatement || !generatedStatement.personal_statement) return;
 
         const paragraphOrder = [
-            '开头与自我介绍与申请目标',
-            '科研经历',
-            '课外与领导',
-            '职业规划',
-            '择校理由',
-            '结尾'
+            'introduction_and_goals',
+            'research_experience',
+            'activities_and_leadership',
+            'career_plan',
+            'reasons_for_school',
+            'conclusion'
         ];
 
+        const paragraphLabels = {
+            'introduction_and_goals': '开头与自我介绍与申请目标',
+            'research_experience': '科研经历',
+            'activities_and_leadership': '课外与领导',
+            'career_plan': '职业规划',
+            'reasons_for_school': '择校理由',
+            'conclusion': '结尾'
+        };
+
         const fullText = paragraphOrder
-            .map(key => generatedStatement.个人陈述[key])
+            .map(key => generatedStatement.personal_statement[key])
             .filter(content => content)
             .join('\n\n');
 
@@ -158,22 +169,30 @@ const PSGenerator = () => {
     };
 
     const renderPersonalStatement = () => {
-        if (!generatedStatement || !generatedStatement.个人陈述) return null;
+        if (!generatedStatement || !generatedStatement.personal_statement) return null;
 
         const paragraphOrder = [
-            '开头与自我介绍与申请目标',
-            '科研经历',
-            '课外与领导',
-            '职业规划',
-            '择校理由',
-            '结尾'
+            'introduction_and_goals',
+            'research_experience',
+            'activities_and_leadership',
+            'career_plan',
+            'reasons_for_school',
+            'conclusion'
         ];
+
+        const paragraphLabels = {
+            'introduction_and_goals': '开头与自我介绍与申请目标',
+            'research_experience': '科研经历',
+            'activities_and_leadership': '课外与领导',
+            'career_plan': '职业规划',
+            'reasons_for_school': '择校理由',
+            'conclusion': '结尾'
+        };
 
         return (
             <div className="space-y-4">
-                <h3 className="font-bold text-lg mb-4 text-gray-800 dark:text-gray-200">个人陈述</h3>
                 {paragraphOrder.map((key, index) => {
-                    const content = generatedStatement.个人陈述[key];
+                    const content = generatedStatement.personal_statement[key];
                     if (!content) return null;
 
                     return (

@@ -91,8 +91,14 @@ const CVPage = () => {
   useEffect(() => {
     if (editContent && (history.length === 0 || editContent !== history[historyIndex])) {
       addHistory(editContent);
+      
+      // 保存到历史记录（避免重复保存相同内容）
+      if (editContent.trim()) {
+        const historyItem = createHistoryItem(editContent, config, resumeData, 'edit');
+        saveHistoryItem(historyItem);
+      }
     }
-  }, [editContent]);
+  }, [editContent, config, resumeData, history, historyIndex, addHistory]);
 
   const handleRender = (content) => {
     setEditContent(content);
@@ -101,6 +107,12 @@ const CVPage = () => {
     // 更新自动保存
     if (autoSaveManagerRef.current) {
       autoSaveManagerRef.current.update(content, config, resumeData);
+    }
+    
+    // 保存到历史记录
+    if (content.trim()) {
+      const historyItem = createHistoryItem(content, config, resumeData, 'content_update');
+      saveHistoryItem(historyItem);
     }
   };
 
@@ -181,11 +193,7 @@ const CVPage = () => {
 
   // 处理历史记录恢复
   const handleRestoreHistory = useCallback((historyItem) => {
-    console.log('收到历史记录恢复请求:', historyItem);
-    
     if (historyItem && historyItem.content) {
-      console.log('正在恢复内容，长度:', historyItem.content.length);
-      
       // 恢复编辑内容
       setEditContent(historyItem.content);
       setPreviewContent(historyItem.content);
@@ -204,10 +212,7 @@ const CVPage = () => {
       if (autoSaveManagerRef.current) {
         autoSaveManagerRef.current.update(historyItem.content, historyItem.config, historyItem.resumeData);
       }
-      
-      console.log('历史记录恢复完成');
     } else {
-      console.error('历史记录恢复失败：无效的历史记录项');
       alert('历史记录恢复失败：无效的历史记录项');
     }
   }, []);

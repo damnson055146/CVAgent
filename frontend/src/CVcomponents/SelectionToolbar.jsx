@@ -24,6 +24,8 @@ const SelectionToolbar = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [currentPosition, setCurrentPosition] = useState(position);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
 
   // 使用 useRef 来存储事件处理函数，确保引用稳定
   const mouseMoveHandlerRef = useRef(null);
@@ -33,6 +35,25 @@ const SelectionToolbar = ({
   useEffect(() => {
     setCurrentPosition(position);
   }, [position]);
+
+  // 监听屏幕宽度变化，实现自适应
+  useEffect(() => {
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 根据屏幕宽度自动调整收缩状态
+  useEffect(() => {
+    if (screenWidth < 768) { // 小屏幕自动收缩
+      setIsCollapsed(true);
+    } else if (screenWidth > 1024) { // 大屏幕自动展开
+      setIsCollapsed(false);
+    }
+  }, [screenWidth]);
 
   // 调试信息
   console.log('SelectionToolbar props:', {
@@ -174,23 +195,23 @@ const SelectionToolbar = ({
 
   // 计算工具栏宽度
   const getToolbarWidth = () => {
-    if (aiPreview) return '500px';
-    if (showPromptInput) return '320px'; // 固定自定义模式下的宽度
-    return '280px';
+    if (aiPreview) return isCollapsed ? '200px' : '500px';
+    if (showPromptInput) return isCollapsed ? '180px' : '320px';
+    return isCollapsed ? '160px' : '280px';
   };
 
   // 计算工具栏最大宽度
   const getToolbarMaxWidth = () => {
-    if (aiPreview) return '600px';
-    if (showPromptInput) return '400px'; // 设置最大宽度限制
-    return '350px';
+    if (aiPreview) return isCollapsed ? '250px' : '600px';
+    if (showPromptInput) return isCollapsed ? '220px' : '400px';
+    return isCollapsed ? '200px' : '350px';
   };
 
   // 计算工具栏高度
   const getToolbarHeight = () => {
-    if (aiPreview) return '120px';
-    if (showPromptInput) return '160px'; // 减少自定义模式下的高度
-    return '48px';
+    if (aiPreview) return isCollapsed ? '80px' : '120px';
+    if (showPromptInput) return isCollapsed ? '120px' : '160px';
+    return isCollapsed ? '40px' : '48px';
   };
 
   return (
@@ -212,96 +233,118 @@ const SelectionToolbar = ({
       onMouseDown={handleMouseDown}
       onWheel={handleToolbarWheel}
     >
-      {/* 拖拽指示器 */}
-      <div className="flex items-center justify-center p-1 bg-gray-50 dark:bg-gray-700 rounded-t-lg border-b border-gray-200 dark:border-gray-600 cursor-grab active:cursor-grabbing">
-        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">拖拽移动</span>
+      {/* 拖拽指示器和收缩控制 */}
+      <div className="flex items-center justify-between p-1 bg-gray-50 dark:bg-gray-700 rounded-t-lg border-b border-gray-200 dark:border-gray-600">
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium cursor-grab active:cursor-grabbing">拖拽移动</span>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1 rounded transition-colors"
+          title={isCollapsed ? "展开工具栏" : "收缩工具栏"}
+        >
+          {isCollapsed ? "⤢" : "⤢"}
+        </button>
       </div>
 
       {/* 主工具栏 */}
-      <div className="flex items-center p-2 space-x-1">
-        <Button
-          type="ghost"
-          size="sm"
-          onClick={(e) => handleButtonClick(e, onOptimize)}
-          disabled={isProcessing}
-          className="text-xs px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200"
-        >
-          {isProcessing && processingType === 'optimize' ? '优化中...' : '优化'}
-        </Button>
+      <div className={`flex items-center p-2 space-x-1 ${isCollapsed ? 'flex-wrap justify-center' : ''}`}>
+        {/* 文本优化类功能组 */}
+        <div className={`flex items-center space-x-1 ${isCollapsed ? 'flex-col space-y-1' : ''}`}>
+          <Button
+            type="ghost"
+            size="sm"
+            onClick={(e) => handleButtonClick(e, onOptimize)}
+            disabled={isProcessing}
+            className={`text-xs px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200 ${isCollapsed ? 'w-full' : ''}`}
+            title="优化选中文本"
+          >
+            {isProcessing && processingType === 'optimize' ? '优化中...' : (isCollapsed ? '优' : '优化')}
+          </Button>
 
-        <Button
-          size="sm"
-          onClick={(e) => handleButtonClick(e, onExpand)}
-          disabled={isProcessing}
-          type="ghost"
-          className="text-xs px-2 py-1 hover:bg-green-50 dark:hover:bg-green-900 text-gray-700 dark:text-gray-200"
-        >
-          {isProcessing && processingType === 'expand' ? '扩写中...' : '扩写'}
-        </Button>
+          <Button
+            size="sm"
+            onClick={(e) => handleButtonClick(e, onExpand)}
+            disabled={isProcessing}
+            type="ghost"
+            className={`text-xs px-2 py-1 hover:bg-green-50 dark:hover:bg-green-900 text-gray-700 dark:text-gray-200 ${isCollapsed ? 'w-full' : ''}`}
+            title="扩写选中文本"
+          >
+            {isProcessing && processingType === 'expand' ? '扩写中...' : (isCollapsed ? '扩' : '扩写')}
+          </Button>
 
-        <Button
-          size="sm"
-          onClick={(e) => handleButtonClick(e, onContract)}
-          disabled={isProcessing}
-          type="ghost"
-          className="text-xs px-2 py-1 hover:bg-orange-50 dark:hover:bg-orange-900 text-gray-700 dark:text-gray-200"
-        >
-          {isProcessing && processingType === 'contract' ? '缩写中...' : '缩写'}
-        </Button>
+          <Button
+            size="sm"
+            onClick={(e) => handleButtonClick(e, onContract)}
+            disabled={isProcessing}
+            type="ghost"
+            className={`text-xs px-2 py-1 hover:bg-orange-50 dark:hover:bg-orange-900 text-gray-700 dark:text-gray-200 ${isCollapsed ? 'w-full' : ''}`}
+            title="缩写选中文本"
+          >
+            {isProcessing && processingType === 'contract' ? '缩写中...' : (isCollapsed ? '缩' : '缩写')}
+          </Button>
+        </div>
 
+        {/* 分隔线 */}
+        {!isCollapsed && <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1"></div>}
+
+        {/* 自定义功能 */}
         <Button
           size="sm"
           onClick={(e) => handleButtonClick(e, handleCustomPromptClick)}
           disabled={isProcessing}
           type="ghost"
-          className={`text-xs px-2 py-1 hover:bg-purple-50 dark:hover:bg-purple-900 text-gray-700 dark:text-gray-200 ${showPromptInput ? 'bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300' : ''
-            }`}
+          className={`text-xs px-2 py-1 hover:bg-purple-50 dark:hover:bg-purple-900 text-gray-700 dark:text-gray-200 ${showPromptInput ? 'bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300' : ''} ${isCollapsed ? 'w-full' : ''}`}
+          title="自定义指令"
         >
-          {isProcessing && processingType === 'custom' ? '处理中...' : '自定义'}
+          {isProcessing && processingType === 'custom' ? '处理中...' : (isCollapsed ? '自' : '自定义')}
         </Button>
 
         {/* AI预览结果按钮 */}
         {aiPreview && (
           <>
-            <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1"></div>
-            <Button
-              type="primary"
-              size="sm"
-              onClick={onAdopt}
-              className="bg-emerald-500 text-white hover:bg-emerald-600 text-xs px-3 py-1"
-            >
-              采用
-            </Button>
-            <Button
-              type="secondary"
-              size="sm"
-              onClick={onCancelPreview}
-              className="text-xs px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-            >
-              取消
-            </Button>
+            {!isCollapsed && <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1"></div>}
+            <div className={`flex items-center space-x-1 ${isCollapsed ? 'flex-col space-y-1' : ''}`}>
+              <Button
+                type="primary"
+                size="sm"
+                onClick={onAdopt}
+                className={`bg-emerald-500 text-white hover:bg-emerald-600 text-xs px-3 py-1 ${isCollapsed ? 'w-full' : ''}`}
+                title="采用AI修改结果"
+              >
+                {isCollapsed ? '采' : '采用'}
+              </Button>
+              <Button
+                type="secondary"
+                size="sm"
+                onClick={onCancelPreview}
+                className={`text-xs px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 ${isCollapsed ? 'w-full' : ''}`}
+                title="取消AI修改"
+              >
+                {isCollapsed ? '取' : '取消'}
+              </Button>
+            </div>
           </>
         )}
 
         {/* 关闭按钮 */}
-        <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1"></div>
+        {!isCollapsed && <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1"></div>}
         <button
           onClick={onClose}
-          className="px-1.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className={`px-1.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 ${isCollapsed ? 'w-full' : ''}`}
+          title="关闭工具栏"
         >
-          ✕
+          {isCollapsed ? '✕' : '✕'}
         </button>
       </div>
 
       {/* AI返回内容显示区域 */}
       {aiPreview && (
-        <div className="border-t border-gray-200 dark:border-gray-600 p-3">
+        <div className={`border-t border-gray-200 dark:border-gray-600 p-3 ${isCollapsed ? 'p-2' : ''}`}>
           <div className="mb-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              AI 修改结果：
+            <label className={`block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 ${isCollapsed ? 'text-center' : ''}`}>
+              {isCollapsed ? 'AI结果' : 'AI 修改结果：'}
             </label>
             <div 
-              className="w-full max-h-32 overflow-y-auto overflow-x-auto px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 whitespace-pre-wrap max-w-full scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800"
+              className={`w-full overflow-y-auto overflow-x-auto px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 whitespace-pre-wrap max-w-full scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800 ${isCollapsed ? 'max-h-20 text-xs' : 'max-h-32'}`}
               onMouseDown={(e) => {
                 // 允许滚动条区域的正常交互
                 if (e.target.classList.contains('scrollbar-thumb') || 
@@ -315,7 +358,7 @@ const SelectionToolbar = ({
                 e.stopPropagation();
               }}
             >
-              {aiPreview}
+              {isCollapsed ? (aiPreview.length > 50 ? aiPreview.substring(0, 50) + '...' : aiPreview) : aiPreview}
             </div>
           </div>
         </div>
@@ -323,14 +366,14 @@ const SelectionToolbar = ({
 
       {/* 自定义提示输入区 */}
       {showPromptInput && (
-        <div className="border-t border-gray-200 dark:border-gray-600 p-2">
+        <div className={`border-t border-gray-200 dark:border-gray-600 p-2 ${isCollapsed ? 'p-1' : ''}`}>
           {/* 选中文本显示区域 */}
-          <div className="mb-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              选中文本：
+          <div className={`mb-2 ${isCollapsed ? 'mb-1' : ''}`}>
+            <label className={`block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 ${isCollapsed ? 'text-center' : ''}`}>
+              {isCollapsed ? '选中文本' : '选中文本：'}
             </label>
             <div 
-              className="w-full max-h-16 overflow-y-auto overflow-x-auto px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 whitespace-pre-wrap max-w-full scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800"
+              className={`w-full overflow-y-auto overflow-x-auto px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 whitespace-pre-wrap max-w-full scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800 ${isCollapsed ? 'max-h-12 text-xs' : 'max-h-16'}`}
               onMouseDown={(e) => {
                 // 检查是否点击在滚动条区域
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -345,19 +388,19 @@ const SelectionToolbar = ({
                 e.stopPropagation();
               }}
             >
-              {selectedText}
+              {isCollapsed ? (selectedText.length > 30 ? selectedText.substring(0, 30) + '...' : selectedText) : selectedText}
             </div>
           </div>
 
-          <div className="mb-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              自定义指令：
+          <div className={`mb-2 ${isCollapsed ? 'mb-1' : ''}`}>
+            <label className={`block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 ${isCollapsed ? 'text-center' : ''}`}>
+              {isCollapsed ? '指令' : '自定义指令：'}
             </label>
             <textarea
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="请输入自定义指令..."
-              className="w-full h-12 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800"
+              placeholder={isCollapsed ? "指令..." : "请输入自定义指令..."}
+              className={`w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800 ${isCollapsed ? 'h-8 text-xs' : 'h-12'}`}
               autoFocus
               onMouseDown={(e) => {
                 // 允许滚动条区域的正常交互
@@ -373,23 +416,23 @@ const SelectionToolbar = ({
               }}
             />
           </div>
-          <div className="flex justify-end space-x-1">
+          <div className={`flex justify-end space-x-1 ${isCollapsed ? 'space-x-0.5' : ''}`}>
             <Button
               type="ghost"
               size="sm"
               onClick={handlePromptCancel}
-              className="text-xs px-2 py-1 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              className={`text-xs px-2 py-1 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 ${isCollapsed ? 'px-1' : ''}`}
             >
-              取消
+              {isCollapsed ? '取' : '取消'}
             </Button>
             <Button
               type="primary"
               size="sm"
               onClick={handlePromptSubmit}
               disabled={!customPrompt.trim() || isProcessing}
-              className="text-xs px-2 py-1"
+              className={`text-xs px-2 py-1 ${isCollapsed ? 'px-1' : ''}`}
             >
-              确认
+              {isCollapsed ? '确' : '确认'}
             </Button>
           </div>
         </div>

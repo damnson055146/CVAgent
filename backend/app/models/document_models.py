@@ -7,8 +7,8 @@ import enum
 
 class DocType(enum.Enum):
     resume = "resume"
-    personal_statement = "personal_statement"
-    recommendation = "recommendation"
+    letter = "letter"  # 对应 personal_statement
+    sop = "sop"        # 对应 recommendation
 
 class ContentFormat(enum.Enum):
     markdown = "markdown"

@@ -1,10 +1,18 @@
 import { API_BASE_URL, API_ENDPOINTS, API_KEY } from '../config/api.config';
 
 // 复用已有的请求头和响应处理
-const getHeaders = () => ({
-  'X-API-Key': API_KEY,
-  'Content-Type': 'application/json',
-});
+const getHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
 
 // 获取用户ID
 const getUserId = () => {

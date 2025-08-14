@@ -61,7 +61,6 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
             
             // 获取本地历史记录
             const localItems = getHistoryItems();
-            console.log('本地历史记录:', localItems);
             
             // 确保本地记录有正确的标记，并过滤掉错误的backend_save记录
             const processedLocalItems = localItems
@@ -71,43 +70,51 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
                     isBackend: false, // 明确标记为本地记录
                     isLocal: true // 额外标记
                 }));
-            console.log('处理后的本地历史记录:', processedLocalItems);
             
             // 获取后端历史记录
             const userId = localStorage.getItem('user_id');
             let backendItems = [];
             if (userId) {
                 try {
-                    console.log('正在获取后端历史记录，用户ID:', userId);
-                    const backendResult = await agentAPI.getResumeHistory(userId);
-                    console.log('后端历史记录结果:', backendResult);
+                    // 使用新的API方法获取所有版本历史
+                    const backendResult = await agentAPI.getAllResumeVersions(userId);
                     
-                    // 后端返回的是数组，需要处理每个版本
-                    backendItems = backendResult.map(version => {
-                        // 格式化后端时间戳
-                        const backendTime = new Date(version.created_at);
-                        const timeStr = backendTime.toLocaleString('zh-CN', {
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-                        
-                        return {
-                            id: version.id,
-                            timestamp: version.created_at,
-                            content: version.content_snippet, // 后端返回的是片段
-                            action: 'backend_save', // 标记为后端保存
-                            title: `${extractNameFromContent(version.content_snippet)} (后端保存 ${timeStr} v${version.version_number})`,
-                            preview: generatePreview(version.content_snippet),
-                            isBackend: true, // 标记为后端记录
-                            isLocal: false, // 明确标记为非本地记录
-                            version_number: version.version_number
-                        };
-                    });
-                    console.log('处理后端历史记录:', backendItems);
+                    // 验证后端返回的数据格式
+                    if (!Array.isArray(backendResult)) {
+
+                        backendItems = [];
+                    } else {
+                        // 后端返回的是版本数组，需要处理每个版本
+                        backendItems = backendResult
+                            .filter(version => version && version.id) // 过滤掉无效的版本
+                            .map(version => {
+                                // 格式化后端时间戳
+                                const backendTime = new Date(version.created_at);
+                                const timeStr = backendTime.toLocaleString('zh-CN', {
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+                                
+                                return {
+                                    id: version.id,
+                                    timestamp: version.created_at,
+                                    content: version.content_snippet, // 后端返回的是片段
+                                    action: 'backend_save', // 标记为后端保存
+                                    title: `${extractNameFromContent(version.content_snippet)} (${version.document_title} v${version.version_number} ${timeStr})`,
+                                    preview: generatePreview(version.content_snippet),
+                                    isBackend: true, // 标记为后端记录
+                                    isLocal: false, // 明确标记为非本地记录
+                                    version_number: version.version_number,
+                                    document_id: version.document_id,
+                                    document_title: version.document_title
+                                };
+                            });
+                    }
                 } catch (error) {
                     console.error('获取后端历史记录失败:', error);
+                    // 不抛出错误，继续使用本地记录
                 }
             }
             
@@ -116,7 +123,6 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
                 new Date(b.timestamp) - new Date(a.timestamp)
             );
             
-            console.log('最终历史记录列表:', allItems);
             setHistoryItems(allItems);
         } catch (error) {
             console.error('加载历史记录失败:', error);
@@ -139,10 +145,21 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
             
             // 如果是后端记录，需要先获取完整内容
             if (item.isBackend) {
-                console.log('正在获取后端版本的完整内容:', item.id);
-                const fullVersion = await agentAPI.getResumeVersion(item.id);
-                contentToRestore = fullVersion.content;
-                console.log('获取到的完整内容长度:', contentToRestore.length);
+    
+                try {
+                    const fullVersion = await agentAPI.getResumeVersion(item.id);
+                    contentToRestore = fullVersion.content;
+        
+                } catch (error) {
+                    // 如果版本不存在，可能是已被删除，刷新历史记录
+                    if (error.message.includes('404') || error.message.includes('未找到该版本')) {
+                        console.warn('版本不存在，可能是已被删除，正在刷新历史记录...');
+                        alert('该版本可能已被删除，正在刷新历史记录...');
+                        await loadHistoryItems(); // 重新加载历史记录
+                        return; // 退出恢复操作
+                    }
+                    throw error; // 重新抛出其他错误
+                }
             }
             
             // 创建恢复项，包含完整内容
@@ -153,7 +170,7 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
                 resumeData: item.resumeData || null
             };
             
-            console.log('准备恢复历史记录:', restoredItem);
+
             
             if (onRestore) {
                 onRestore(restoredItem);
@@ -161,7 +178,18 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
             }
         } catch (error) {
             console.error('恢复历史记录失败:', error);
-            alert('恢复历史记录失败，请重试');
+            
+            // 提供更友好的错误提示
+            let errorMessage = '恢复历史记录失败，请重试';
+            if (error.message.includes('404') || error.message.includes('未找到该版本')) {
+                errorMessage = '该版本不存在或已被删除，请刷新历史记录后重试';
+            } else if (error.message.includes('403')) {
+                errorMessage = '您没有权限访问该版本';
+            } else if (error.message.includes('网络') || error.message.includes('fetch')) {
+                errorMessage = '网络连接失败，请检查网络后重试';
+            }
+            
+            alert(errorMessage);
         }
     };
 
@@ -169,18 +197,18 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
         // 如果是后端记录，调用后端删除接口
         if (item.isBackend) {
             try {
-                console.log('正在删除后端版本:', item.id);
+
                 const userId = localStorage.getItem('user_id');
                 const result = await agentAPI.deleteResumeVersion(item.id, userId);
-                console.log('删除结果:', result);
+
                 
                 // 检查删除是否成功（支持多种成功响应格式）
                 if (result.success || result.message || (result && typeof result === 'object')) {
-                    console.log('删除成功，重新加载历史记录');
+    
                     
                     // 显示成功提示
                     const successMessage = result.message || '删除成功';
-                    console.log(successMessage);
+
                     
                     // 从当前列表中移除该项
                     setHistoryItems(prevItems => prevItems.filter(prevItem => prevItem.id !== item.id));
@@ -194,13 +222,30 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
                 }
             } catch (error) {
                 console.error('删除历史版本失败:', error);
-                alert(`删除历史版本失败: ${error.message}`);
+                
+                // 提供更友好的错误提示
+                let errorMessage = '删除历史版本失败';
+                if (error.message.includes('404') || error.message.includes('未找到该版本')) {
+                    errorMessage = '该版本不存在或已被删除，正在刷新历史记录...';
+                    // 自动刷新历史记录
+                    setTimeout(() => {
+                        loadHistoryItems();
+                    }, 100);
+                } else if (error.message.includes('403')) {
+                    errorMessage = '您没有权限删除该版本';
+                } else if (error.message.includes('网络') || error.message.includes('fetch')) {
+                    errorMessage = '网络连接失败，请检查网络后重试';
+                } else {
+                    errorMessage = `删除失败: ${error.message}`;
+                }
+                
+                alert(errorMessage);
             }
         } else {
             // 本地记录使用原有删除方法
-            console.log('正在删除本地记录:', item.id);
+
             if (deleteHistoryItem(item.id)) {
-                console.log('本地记录删除成功，重新加载历史记录');
+
                 loadHistoryItems();
             } else {
                 alert('删除本地记录失败');
@@ -218,7 +263,7 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
         try {
             // 1. 清空本地历史记录
             clearAllHistory();
-            console.log('本地历史记录已清空');
+
 
             // 2. 清空后端历史记录
             const userId = localStorage.getItem('user_id');
@@ -226,14 +271,14 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
                 try {
                     // 获取所有后端版本并逐个删除
                     const backendResult = await agentAPI.getResumeHistory(userId);
-                    console.log('获取到的后端版本:', backendResult);
+
                     
                     // 删除所有后端版本
                     for (const version of backendResult) {
                         try {
                             const deleteResult = await agentAPI.deleteResumeVersion(version.id, userId);
                             if (deleteResult.success) {
-                                console.log(`已删除后端版本: ${version.id}`);
+    
                             } else {
                                 console.error(`删除后端版本 ${version.id} 失败: 返回结果不正确`);
                             }
@@ -241,7 +286,7 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
                             console.error(`删除后端版本 ${version.id} 失败:`, error);
                         }
                     }
-                    console.log('所有后端历史记录已清空');
+
                 } catch (error) {
                     console.error('清空后端历史记录失败:', error);
                 }
@@ -250,7 +295,7 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
             // 3. 重新加载历史记录（应该为空）
             await loadHistoryItems();
             
-            console.log('所有历史记录已清空');
+
         } catch (error) {
             console.error('清空历史记录失败:', error);
             alert('清空历史记录失败，请重试');
@@ -319,34 +364,20 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* 面板头部 */}
-                                            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
-                            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                                历史版本
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                历史记录
                             </h2>
-                            <div className="flex items-center gap-1">
-                                {/* 清理错误记录按钮 */}
+                            <div className="flex items-center gap-2">
+                                {/* 刷新按钮 */}
                                 <button
-                                    onClick={() => {
-                                        if (cleanBackendSaveRecords()) {
-                                            loadHistoryItems();
-                                            alert('已清理错误的backend_save记录');
-                                        } else {
-                                            alert('没有发现错误的记录需要清理');
-                                        }
-                                    }}
-                                    className="text-blue-500 dark:text-blue-400 text-xs px-2 py-1 rounded-md hover:shadow-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                    onClick={loadHistoryItems}
+                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 hover:shadow-sm transition-all"
+                                    title="刷新历史记录"
                                 >
-                                    清理错误
+                                    <RotateCcw size={16} className="text-gray-500 dark:text-gray-400" />
                                 </button>
-                                {/* 清空按钮 - 无边框，悬停阴影 */}
-                                <button
-                                    onClick={handleClearAllHistory}
-                                    disabled={isClearing}
-                                    className="text-red-500 dark:text-red-400 text-xs px-2 py-1 rounded-md hover:shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isClearing ? '清空中...' : '清空'}
-                                </button>
-                                {/* 关闭按钮 - 纯图标无边框 */}
+                                {/* 关闭按钮 */}
                                 <button
                                     onClick={onClose}
                                     className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 hover:shadow-sm transition-all"
@@ -459,13 +490,6 @@ const HistoryPanel = ({ isOpen, onClose, onRestore }) => {
                                         {historyItems.filter(item => item.isBackend).length}
                                     </span>
                                 </div>
-                            </div>
-                            {/* 调试信息 */}
-                            <div className="mt-1 text-xs text-gray-400">
-                                <div>调试信息:</div>
-                                <div>本地记录详情: {historyItems.filter(item => !item.isBackend).map(item => `${item.action}(${item.isLocal ? '本地' : '未知'})`).join(', ')}</div>
-                                <div>后端记录详情: {historyItems.filter(item => item.isBackend).map(item => `${item.action}(${item.isLocal ? '本地' : '后端'})`).join(', ')}</div>
-                                <div>清理状态: {cleanBackendSaveRecords() ? '已清理错误记录' : '无需清理'}</div>
                             </div>
                         </div>
                     </div>

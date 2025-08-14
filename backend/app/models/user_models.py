@@ -31,8 +31,8 @@ class User(Base):
         CheckConstraint("status IN (0,1,2)", name="users_status_check"),
     )
     
-    # 反向关系
-    documents = relationship("Document", back_populates="user")
-    document_versions = relationship("DocumentVersion", back_populates="created_by_user")
+    # 反向关系 - 使用字符串引用避免循环导入
+    documents = relationship("Document", back_populates="user", lazy="dynamic")
+    document_versions = relationship("DocumentVersion", back_populates="created_by_user", lazy="dynamic")
 
     

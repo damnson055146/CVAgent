@@ -116,13 +116,13 @@ class NewResumeProfile(BaseModel):
 class APIDocType(str, Enum):
     """API层面的文档类型枚举。"""
     resume = "resume"
-    personal_statement = "personal_statement"
-    recommendation = "recommendation"
+    letter = "letter"  # 对应 personal_statement
+    sop = "sop"        # 对应 recommendation
 
 class DocumentTypeEnum(str, Enum):
-    resume             = "resume"
-    personal_statement = "personal_statement"
-    recommendation     = "recommendation"
+    resume = "resume"
+    letter = "letter"  # 对应 personal_statement
+    sop = "sop"        # 对应 recommendation
 
 class UserDocQuery(BaseModel):
     """用于需要用户ID的请求体的模式。"""

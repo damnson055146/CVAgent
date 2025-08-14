@@ -14,7 +14,9 @@ from dotenv import load_dotenv
 from app.api.routes import router
 from app.api.auth_routes import router as auth_router
 # from app.api.document_routes import router as document_router
-from app.models import user_models, document_models
+# 先导入document_models以避免循环导入问题
+from app.models import document_models
+from app.models import user_models
 from app.models.api_log_models import APILog
 from app.database import get_db, Base, engine
 from app.models import schemas
@@ -35,7 +37,9 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
-        "http://127.0.0.1:5174"
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -47,10 +51,10 @@ app.include_router(router)
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 # app.include_router(document_router, prefix="/documents", tags=["documents"])
 
-# 创建数据库表
-user_models.Base.metadata.create_all(bind=engine)
-document_models.Base.metadata.create_all(bind=engine)
-APILog.metadata.create_all(bind=engine)
+# 创建数据库表 - 注释掉，因为已经用SQL脚本创建了
+# user_models.Base.metadata.create_all(bind=engine)
+# document_models.Base.metadata.create_all(bind=engine)
+# APILog.metadata.create_all(bind=engine)
 
 @app.get("/")
 async def root():
@@ -80,7 +84,7 @@ async def create_document_endpoint(
     向documents表插入一行数据，title和current_version_id都设为空。
     """
     try:
-        valid_types = {"resume", "personal_statement", "recommendation"}
+        valid_types = {"resume", "letter", "sop"}
         if doc_type not in valid_types:
             raise ValueError(f"无效的文档类型: {doc_type}。有效类型: {sorted(valid_types)}")
 
@@ -171,7 +175,7 @@ async def get_user_documents_by_type(
     type从URL可以获取。
     """
     try:
-        valid_types = {"resume", "personal_statement", "recommendation"}
+        valid_types = {"resume", "letter", "sop"}
         if doc_type not in valid_types:
             raise ValueError(f"无效的文档类型: {doc_type}。有效类型: {sorted(valid_types)}")
 
@@ -493,6 +497,6 @@ async def list_personal_statement_profiles(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8699)
 
 

@@ -102,9 +102,11 @@ const BrainstormPanel = ({ onClose, onApplyQuestions }) => {
 
   const handleApplyQuestions = () => {
     if (brainstormResults && onApplyQuestions) {
-      const allQuestions = brainstormResults.questions.flatMap(category => 
-        category.questions.map(q => `• ${q}`)
-      ).join('\n');
+      const allQuestions = brainstormResults.questions.flatMap(categoryObj => {
+        const categoryName = Object.keys(categoryObj)[0];
+        const questions = categoryObj[categoryName] || [];
+        return questions.map(q => `• ${q.question}`);
+      }).join('\n');
       onApplyQuestions(allQuestions);
       onClose();
     }
@@ -112,9 +114,17 @@ const BrainstormPanel = ({ onClose, onApplyQuestions }) => {
 
   const copyToClipboard = () => {
     if (brainstormResults) {
-      const text = brainstormResults.questions.map(category => 
-        `## ${category.category}\n${category.questions.map(q => `• ${q}`).join('\n')}`
-      ).join('\n\n');
+      const text = brainstormResults.questions.map(categoryObj => {
+        const categoryName = Object.keys(categoryObj)[0];
+        const questions = categoryObj[categoryName] || [];
+        const categoryDisplayName = categoryName === 'academic' ? '学术背景' :
+                                   categoryName === 'research' ? '研究经历' :
+                                   categoryName === 'leadership' ? '领导力' :
+                                   categoryName === 'personal' ? '个人特质' :
+                                   categoryName === 'career' ? '职业规划' :
+                                   categoryName === 'motivation' ? '申请动机' : categoryName;
+        return `## ${categoryDisplayName}\n${questions.map(q => `• ${q.question}`).join('\n')}`;
+      }).join('\n\n');
       
       navigator.clipboard.writeText(text)
         .then(() => alert('已复制到剪贴板'))
@@ -336,20 +346,31 @@ const BrainstormPanel = ({ onClose, onApplyQuestions }) => {
         </div>
 
         <div className="space-y-4 max-h-96 overflow-y-auto">
-          {brainstormResults.questions.map((category, index) => (
-            <div key={index} className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
-                {category.category}
-              </h4>
-              <ul className="space-y-2">
-                {category.questions.map((question, qIndex) => (
-                  <li key={qIndex} className="text-sm text-gray-700 dark:text-gray-300">
-                    • {question}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {brainstormResults.questions.map((categoryObj, index) => {
+            // 处理API返回的数据结构：每个categoryObj是一个对象，如{"academic": [...]}
+            const categoryName = Object.keys(categoryObj)[0];
+            const questions = categoryObj[categoryName] || [];
+            
+            return (
+              <div key={index} className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
+                  {categoryName === 'academic' ? '学术背景' :
+                   categoryName === 'research' ? '研究经历' :
+                   categoryName === 'leadership' ? '领导力' :
+                   categoryName === 'personal' ? '个人特质' :
+                   categoryName === 'career' ? '职业规划' :
+                   categoryName === 'motivation' ? '申请动机' : categoryName}
+                </h4>
+                <ul className="space-y-2">
+                  {questions.map((questionObj, qIndex) => (
+                    <li key={qIndex} className="text-sm text-gray-700 dark:text-gray-300">
+                      • {questionObj.question}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </div>
       </div>
     );

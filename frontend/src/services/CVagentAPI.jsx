@@ -256,6 +256,62 @@ const agentAPI = {
   },
 
   /**
+   * 获取指定文档的版本历史
+   * @param {string} docId - 文档ID
+   * @returns {Promise<Array>}
+   */
+  getDocumentVersions: async (docId) => {
+    const res = await fetch(`${API_BASE_URL}/api/versions/${docId}/history`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        user_id: getUserId(),
+      }),
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * 获取所有简历文档的版本历史
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Array>}
+   */
+  getAllResumeVersions: async (userId) => {
+    try {
+      // 第一步：获取用户的简历文档列表
+      const documents = await agentAPI.getResumeHistory(userId);
+      console.log('获取到的简历文档列表:', documents);
+      
+      // 第二步：获取每个文档的版本历史
+      const allVersions = [];
+      for (const doc of documents) {
+        try {
+          const versions = await agentAPI.getDocumentVersions(doc.id);
+          console.log(`文档 ${doc.id} 的版本历史:`, versions);
+          
+          // 为每个版本添加文档信息
+          const versionsWithDocInfo = versions.map(version => ({
+            ...version,
+            document_id: doc.id,
+            document_title: doc.title || '未命名文档'
+          }));
+          
+          allVersions.push(...versionsWithDocInfo);
+        } catch (error) {
+          console.error(`获取文档 ${doc.id} 的版本历史失败:`, error);
+          // 继续处理其他文档
+        }
+      }
+      
+      console.log('所有版本历史:', allVersions);
+      return allVersions;
+    } catch (error) {
+      console.error('获取所有简历版本失败:', error);
+      throw error;
+    }
+  },
+
+  /**
    * 获取指定版本的完整内容
    * @param {string} versionId - 版本ID
    * @returns {Promise<Object>}

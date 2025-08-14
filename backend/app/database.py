@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 load_dotenv(encoding='utf-8')
 
 # 数据库配置
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:010921@postgres:5432/aiagent")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:13689282250@localhost:5432/backend_db")
 
 # 同步引擎（用于元数据创建等同步场景）
 engine = create_engine(DATABASE_URL)

@@ -1,10 +1,18 @@
 import { API_BASE_URL, API_ENDPOINTS, API_KEY } from '../config/api.config';
 
 // 通用请求头
-const getHeaders = () => ({
-  'X-API-Key': API_KEY,
-  'Content-Type': 'application/json',
-});
+const getHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
 
 // 获取用户ID
 const getUserId = () => {
@@ -45,7 +53,9 @@ export const generatePersonalStatement = async (inputText) => {
 // 头脑风暴相关API
 export const generateBrainstormQuestions = async (params) => {
   try {
-    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.PS.BRAINSTORM}`, {
+    // 头脑风暴API是独立服务，使用完整URL
+    const brainstormUrl = API_ENDPOINTS.PS.BRAINSTORM;
+    const res = await fetch(brainstormUrl, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -54,7 +64,8 @@ export const generateBrainstormQuestions = async (params) => {
         manual_info: params.manualInfo || {},
         prompt_template: params.promptTemplate || '',
         model: params.model || getDefaultModel(),
-        selected_text: params.selectedText || ''
+        selected_text: params.selectedText || '',
+        user_profile: params.userProfile || ''
       }),
     });
     return handleResponse(res);
@@ -82,16 +93,37 @@ export const getUserCVs = async () => {
 };
 
 // 获取CV最新版本内容
-export const getCVLatestVersion = async (cvId) => {
+export const getCVLatestVersion = async (docId) => {
   try {
-    const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GET_VERSION}${cvId}/content`, {
+    // 首先获取文档信息，找到最新版本ID
+    const docRes = await fetch(`${API_BASE_URL}/api/documents/resume/history`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
         user_id: getUserId(),
       }),
     });
-    return handleResponse(res);
+    const docList = await handleResponse(docRes);
+    
+    // 找到对应的文档
+    const targetDoc = docList.find(doc => doc.id === docId);
+    if (!targetDoc) {
+      throw new Error('文档不存在');
+    }
+    
+    // 如果有当前版本ID，获取版本内容
+    if (targetDoc.current_version_id) {
+      const versionRes = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CV.GET_VERSION}${targetDoc.current_version_id}/content`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          user_id: getUserId(),
+        }),
+      });
+      return handleResponse(versionRes);
+    } else {
+      throw new Error('文档没有可用版本');
+    }
   } catch (error) {
     console.error('Error getting CV latest version:', error);
     throw error;

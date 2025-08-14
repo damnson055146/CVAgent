@@ -173,7 +173,7 @@ export const cleanBackendSaveRecords = () => {
     
     if (cleanedHistory.length !== history.length) {
       localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(cleanedHistory));
-      console.log(`清理了 ${history.length - cleanedHistory.length} 条错误的backend_save记录`);
+
       return true;
     }
     return false;
@@ -240,6 +240,10 @@ export class AutoSaveManager {
         'auto_save'
       );
       
+      // 直接保存到localStorage
+      saveHistoryItem(historyItem);
+      
+      // 同时调用回调函数（如果有的话）
       if (this.callback) {
         this.callback(historyItem);
       }
@@ -278,7 +282,8 @@ export const formatTime = (timestamp) => {
   } else {
     return date.toLocaleDateString('zh-CN');
   }
-}; 
+};
+
 /**
  * 重命名历史记录项
  * @param {string} id - 要重命名的历史记录ID
@@ -297,17 +302,17 @@ export const renameHistoryItem = (id, newTitle) => {
     if (itemToRename && newTitle && newTitle.trim()) {
       itemToRename.title = newTitle.trim();
       
-      // 4. 保存回localStorage
+      // 4. 保存更新后的历史记录
       localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
       
-      // 5. 返回成功
+
       return true;
+    } else {
+
+      return false;
     }
-    
-    // 未找到记录或标题无效
-    return false;
   } catch (error) {
-    console.error('重命名历史记录时出错:', error);
+    console.error('重命名历史记录失败:', error);
     return false;
   }
 };
