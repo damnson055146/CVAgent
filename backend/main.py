@@ -41,7 +41,14 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5174",
         "http://localhost:5175",
-        "http://127.0.0.1:5175"
+        "http://127.0.0.1:5175",
+        "http://52.76.179.88:5173",
+        "http://52.76.179.88:5173",
+        "http://101.201.60.17:5173", 
+        "http://13.248.237.231:5173",
+        "http://166.117.151.221:5173",
+        "http://offerr.net",
+        "https://offerr.net"
     ],
     allow_credentials=True,
     allow_methods=["*"],
