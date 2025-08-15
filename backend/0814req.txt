@@ -1,0 +1,19 @@
+1.在backend中实现生成时可以切换模型，切换模型
+sf里的llm 我个人建议 dsv3 0528，qwen3a23b，glm那个新的可以备选测试但是清华系llm我得到的消息是不靠谱。 openai就上o3，5 thinking，4.1，5fast。 o3 effort拉满
+默认设置gpt5 fast， fallback 5thinking-o3-4.1-其他模型
+
+
+2.选取文章模板塞入提示词作为参考，进行风格迁移,
+使用agent进行开发，先单独新建一个和backend同级的文件夹
+做lstm的分层设计context不会超
+需要遵循指令拆分任务啦
+默认设置gpt5 fast， fallback 5thinking-o3-4.1-其他模型
+validation失败了就去其他模型
+executor我个人建议默认设置是以validation为标志
+
+3.前端显示就是类似dify那种可以开多个窗口并行看结果的 最多四个
+
+重要提示：
+1.现生成分析文档和实现方案
+2.经过同意后，添置必要注释和声明
+3.再填入函数体本身

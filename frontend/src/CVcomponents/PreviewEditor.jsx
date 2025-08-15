@@ -124,18 +124,18 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
     const selectionRect = range.getBoundingClientRect();
     document.body.removeChild(tempSpan);
     
-    // 计算工具栏位置
-    let y = selectionRect.bottom + 8;
-    if (y + toolbarHeight > containerRect.bottom - 10) {
-      y = selectionRect.top - toolbarHeight - 8;
+    // 计算工具栏位置 - 更靠近选择文本
+    let y = selectionRect.bottom + 3; // 进一步减少距离
+    if (y + toolbarHeight > containerRect.bottom - 3) {
+      y = selectionRect.top - toolbarHeight - 3; // 进一步减少距离
     }
     let x = selectionRect.left + (selectionRect.width / 2) - (toolbarWidth / 2);
     
-    // 约束在编辑区域内
-    const minX = containerRect.left + 5;
-    const maxX = containerRect.right - toolbarWidth - 5;
+    // 约束在编辑区域内，但允许更靠近边缘
+    const minX = containerRect.left + 2;
+    const maxX = containerRect.right - toolbarWidth - 2;
     x = Math.max(minX, Math.min(x, maxX));
-    y = Math.max(containerRect.top + 10, Math.min(y, containerRect.bottom - toolbarHeight - 10));
+    y = Math.max(containerRect.top + 2, Math.min(y, containerRect.bottom - toolbarHeight - 2));
     
     const arrowLeft = `${selectionRect.left + (selectionRect.width / 2) - x}px`;
     return { x, y, arrowLeft };
@@ -243,19 +243,9 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
   // Update toolbar position immediately after selection
   useEffect(() => {
     if (showToolbar && selection.text) {
-      // 使用防抖机制，避免频繁的位置计算
-      const timeoutId = setTimeout(() => {
-        const newPosition = getSelectionPosition();
-        // 只有当位置真正改变时才更新，避免不必要的重渲染
-        setToolbarState(prev => {
-          if (prev.x !== newPosition.x || prev.y !== newPosition.y || prev.arrowLeft !== newPosition.arrowLeft) {
-            return newPosition;
-          }
-          return prev;
-        });
-      }, 16); // 约60fps的更新频率
-      
-      return () => clearTimeout(timeoutId);
+      // 立即更新位置，提高响应速度
+      const newPosition = getSelectionPosition();
+      setToolbarState(newPosition);
     }
   }, [showToolbar, selection.text, getSelectionPosition, aiPreview]);
 
@@ -312,13 +302,16 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
               plainEnd
             });
           } else {
-            // 控制符模式：保持原始文本
+            // 控制符模式：保持原始文本，但计算纯文本位置用于高亮显示
+            const selectedPlainText = getPlainTextForDisplay(selectedText);
+            const { plainStart, plainEnd } = getPlainTextSelectionPositions(start, end);
+            
             setSelection({ 
               start, 
               end, 
               text: selectedText, // 使用原始文本内容
-              plainStart: start,
-              plainEnd: end
+              plainStart,
+              plainEnd
             });
           }
           
@@ -337,7 +330,7 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
             cleanupState();
           }
         }
-      }, 100);
+      }, 10); // 进一步减少延迟时间，提高响应速度
     };
     
     const handleKeyUp = (e) => {
@@ -359,13 +352,8 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
   
   const handleScroll = useCallback(() => {
     if (showToolbar && selection.text) {
-      // 添加防抖机制，避免频繁更新
-      if (handleScroll.timeout) {
-        clearTimeout(handleScroll.timeout);
-      }
-      handleScroll.timeout = setTimeout(() => {
-        setToolbarState(getSelectionPosition());
-      }, 16); // 约60fps的更新频率
+      // 立即更新位置，提高响应速度
+      setToolbarState(getSelectionPosition());
     }
   }, [showToolbar, selection.text, getSelectionPosition]);
 
@@ -1177,60 +1165,40 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
         {isPlainTextMode ? "所见即所得模式" : "控制符模式"}
       </button>
 
-      {/* 控制符模式编辑栏 */}
-      {!isPlainTextMode && (
-        <div className="absolute inset-0">
-          <textarea
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              onUpdate?.(e.target.value);
-            }}
-            className="w-full h-full p-4 resize-none outline-none text-sm leading-relaxed font-mono border-none focus:ring-0 bg-transparent"
-            style={{ 
-              caretColor: isDarkMode ? 'white' : 'black',
-              color: isDarkMode ? 'white' : 'black',
-              fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-              lineHeight: '1.5',
-            }}
-            placeholder="在这里编辑Markdown内容..."
-          />
+      {/* 统一的编辑区域 */}
+      <>
+        {/* 文本显示层 */}
+        <div 
+          ref={overlayRef}
+          className="absolute inset-0 p-4 pointer-events-none text-sm leading-relaxed font-mono z-6 whitespace-pre-wrap overflow-hidden"
+          style={{ 
+            wordBreak: 'break-word',
+            fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+            lineHeight: '1.5',
+            color: isDarkMode ? 'white' : 'black',
+            backgroundColor: 'transparent',
+          }}
+          onScroll={handleTextareaScroll}
+        >
+          {isPlainTextMode ? getPlainTextForDisplay(text) : text}
         </div>
-      )}
-
-      {/* 所见即所得模式显示区域 */}
-      {isPlainTextMode && (
-        <>
-          {/* 文本显示层 */}
+        
+        {/* 自定义选择高亮层 */}
+        {selection.text && (
           <div 
-            ref={overlayRef}
-            className="absolute inset-0 p-4 pointer-events-none text-sm leading-relaxed font-mono z-6 whitespace-pre-wrap overflow-hidden"
+            className="absolute inset-0 p-4 pointer-events-none text-sm leading-relaxed font-mono z-8 whitespace-pre-wrap overflow-hidden"
             style={{ 
               wordBreak: 'break-word',
               fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
               lineHeight: '1.5',
-              color: isDarkMode ? 'white' : 'black',
+              color: 'transparent',
               backgroundColor: 'transparent',
             }}
             onScroll={handleTextareaScroll}
           >
-            {getPlainTextForDisplay(text)}
-          </div>
-          
-          {/* 自定义选择高亮层 */}
-          {selection.text && (
-            <div 
-              className="absolute inset-0 p-4 pointer-events-none text-sm leading-relaxed font-mono z-8 whitespace-pre-wrap overflow-hidden"
-              style={{ 
-                wordBreak: 'break-word',
-                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                lineHeight: '1.5',
-                color: 'transparent',
-                backgroundColor: 'transparent',
-              }}
-              onScroll={handleTextareaScroll}
-            >
-              {(() => {
+            {(() => {
+              if (isPlainTextMode) {
+                // 所见即所得模式：使用纯文本位置
                 const plainText = getPlainTextForDisplay(text);
                 const beforeSelection = plainText.substring(0, selection.plainStart);
                 const selectedText = plainText.substring(selection.plainStart, selection.plainEnd);
@@ -1249,31 +1217,50 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
                     <span style={{ color: 'transparent' }}>{afterSelection}</span>
                   </>
                 );
-              })()}
-            </div>
-          )}
-          
-          {/* 编辑层 - 透明但可交互 */}
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={handleChange}
-            onScroll={handleTextareaScroll}
-            className={`absolute inset-0 w-full h-full p-4 resize-none outline-none text-sm leading-relaxed font-mono border-none focus:ring-0 z-10 ${
-              isDarkMode ? 'selection-dark' : 'selection-light'
-            }`}
-            placeholder="在这里编辑内容..."
-            style={{ 
-              caretColor: isDarkMode ? 'white' : 'black',
-              color: 'transparent', // 透明，让纯文本层显示
-              backgroundColor: 'transparent',
-              userSelect: 'auto',
-              fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-              lineHeight: '1.5',
-            }}
-          />
-        </>
-      )}
+              } else {
+                // 控制符模式：使用原始文本位置
+                const beforeSelection = text.substring(0, selection.start);
+                const selectedText = text.substring(selection.start, selection.end);
+                const afterSelection = text.substring(selection.end);
+                
+                return (
+                  <>
+                    <span style={{ color: 'transparent' }}>{beforeSelection}</span>
+                    <span style={{ 
+                      backgroundColor: 'rgba(59, 130, 246, 0.5)', 
+                      color: 'transparent',
+                      borderRadius: '2px'
+                    }}>
+                      {selectedText}
+                    </span>
+                    <span style={{ color: 'transparent' }}>{afterSelection}</span>
+                  </>
+                );
+              }
+            })()}
+          </div>
+        )}
+        
+        {/* 统一的编辑层 */}
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={handleChange}
+          onScroll={handleTextareaScroll}
+          className={`absolute inset-0 w-full h-full p-4 resize-none outline-none text-sm leading-relaxed font-mono border-none focus:ring-0 z-10 ${
+            isDarkMode ? 'selection-dark' : 'selection-light'
+          }`}
+          placeholder={isPlainTextMode ? "在这里编辑内容..." : "在这里编辑Markdown内容..."}
+          style={{ 
+            caretColor: isDarkMode ? 'white' : 'black',
+            color: isPlainTextMode ? 'transparent' : (isDarkMode ? 'white' : 'black'), // 所见即所得模式透明，控制符模式显示文本
+            backgroundColor: 'transparent',
+            userSelect: 'auto',
+            fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+            lineHeight: '1.5',
+          }}
+        />
+      </>
 
       {(showToolbar || showPromptInput) && (
         <div className="selection-toolbar">
@@ -1308,7 +1295,7 @@ const PreviewEditor = forwardRef(({ content, onUpdate, isLoading, isMenuOpen = f
       )}
 
       {/* 添加CSS样式 */}
-      <style jsx>{`
+      <style>{`
         .selection-light ::selection {
           background-color: rgba(59, 130, 246, 0.5);
           color: transparent;
