@@ -8,6 +8,9 @@ WORKDIR /app
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
+# 更换为清华源
+RUN sed -i 's@http://deb.debian.org@https://mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list.d/debian.sources
+
 # 安装系统依赖
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -21,8 +24,8 @@ RUN apt-get update \
 
 # 拷贝并安装 Python 依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    && pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 拷贝应用代码
 COPY main.py .

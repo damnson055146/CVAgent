@@ -41,6 +41,63 @@ _RETRY_BASE_DELAY_MS = int(os.getenv("SILICONFLOW_RETRY_BASE_DELAY_MS", "200") o
 _CB_THRESHOLD = int(os.getenv("SILICONFLOW_CIRCUIT_BREAK_THRESHOLD", "3") or 3)
 _CB_SECONDS = float(os.getenv("SILICONFLOW_CIRCUIT_BREAK_SECONDS", "60") or 60)
 
+_FORMAT_PRESERVE_RULES = """【格式保留规则 - 必须严格遵守】
+- 你将接收 Markdown 文本，必须保留并原样输出以下所有“标记/符号/结构”，不新增、不删除、不改动：
+  1) 标题前缀：#、##、### 等；
+  2) 三冒号区块标记：以“::: left”“::: right”开头的行及其闭合的“:::”行；
+  3) 加粗等内联标记：例如 **联系电话：**、**电话：**、**邮箱：**，必须保持 ** 与其中的“标签文字”完全不变；
+  4) 列表、横线、缩进等 Markdown 结构（如 - 、* 、---）。
+- 你可以在不破坏上述标记的前提下优化或改写“正文内容”，但：
+  - 不能增删“::: left / ::: right / :::”三冒号行；
+  - 不能改动加粗标签中的任何字符（包含全角冒号等标点）；
+  - 不能改变标题行开头的 # 数量；
+  - 不能为原本没有加粗/斜体/代码/链接的文本新增任何 Markdown 内联样式（如 **、__、*、`、[]() 等）；
+  - 不能把原本“未加粗”的键名（如 “专业：”“学位：”“GPA：”）改成加粗；
+  - 不要包裹为代码块；
+  - 不要添加与格式无关的前后缀。
+"""
+
+def _sanitize_output_format(original_text: str, output_text: str) -> str:
+    """Post-process model output to enforce no accidental bolding for label bullets.
+    - If a bullet line in output is like: '- **标签：** 值' but the corresponding label in original
+      was not bolded, strip the added '**' to revert to '- 标签：值'.
+    - Keep spacing and punctuation as much as possible.
+    """
+    try:
+        import re
+        orig_labels_plain: set[str] = set()
+        orig_labels_bold: set[str] = set()
+
+        for line in original_text.splitlines():
+            # match '- **标签：** 值' in original
+            m_bold = re.match(r"^\s*[-*+]\s+\*\*([^：:]+)[：:]\*\*", line)
+            if m_bold:
+                orig_labels_bold.add(m_bold.group(1).strip())
+                continue
+            # match '- 标签：值' in original
+            m_plain = re.match(r"^\s*[-*+]\s+([^：:*`]+)[：:]", line)
+            if m_plain:
+                label = m_plain.group(1).strip()
+                # avoid capturing markdown tokens in label heuristically
+                if label and "**" not in label and "__" not in label:
+                    orig_labels_plain.add(label)
+
+        fixed_lines: List[str] = []
+        for line in output_text.splitlines():
+            # only adjust if output has bold and original did not bold this label
+            m = re.match(r"^(\s*[-*+]\s+)\*\*([^：:]+)[：:]\*\*(\s*)(.*)$", line)
+            if m:
+                prefix, label, space_after, rest = m.groups()
+                if label.strip() in orig_labels_plain and label.strip() not in orig_labels_bold:
+                    # revert to plain label with same punctuation style (use full-width if present in rest start?)
+                    # Default to full-width colon
+                    fixed_lines.append(f"{prefix}{label}：{space_after}{rest}")
+                    continue
+            fixed_lines.append(line)
+        return "\n".join(fixed_lines)
+    except Exception:
+        return output_text
+
 
 def _load_api_keys_once() -> None:
     global _API_KEYS_LOADED, _KEY_STATES
@@ -327,7 +384,7 @@ def _call_siliconflow(prompt: str, user_text: str, model: str, json_output: bool
                     })
                 return parsed
             else:
-                return content
+                return _sanitize_output_format(user_text, content)
 
         except (APIConnectionError, APITimeoutError, APIError) as exc:
             _mark_failure(key_idx)
@@ -385,7 +442,7 @@ def _call_siliconflow_with_meta(prompt: str, user_text: str, model: str, json_ou
                 parsed = {"error": "Failed to parse model output as JSON.", "raw_output": content}
             return parsed, meta
         else:
-            return content, meta
+            return _sanitize_output_format(user_text, content), meta
     except (APIConnectionError, APITimeoutError, APIError) as exc:
         if json_output:
             return {"error": str(exc)}, meta
@@ -437,13 +494,13 @@ _PARSE_RESUME_PROMPT = """请你根据用户的输入分析提取输出部分示
 ##输入
 {{#sys.query#}}"""
 
-_REWRITE_TEXT_PROMPT = """##任务
+_REWRITE_TEXT_PROMPT = f"""##任务
 
             请你根据用户的输入进行改写，使其表达更加书面，改写后的长度尽量在原长度的120%以内。改写时优先保证语义，其次保证长度。
 
             ##输出
 
-            输出你根据任务所得的句子。
+            输出你根据任务所得的句子。{_FORMAT_PRESERVE_RULES}
 
             你只需要返回处理后的文本，严禁包含任何额外的解释、括号、统计信息或原句，只输出最终结果。
 
@@ -451,13 +508,13 @@ _REWRITE_TEXT_PROMPT = """##任务
 
             {{#sys.query#}}"""
 
-_EXPAND_TEXT_PROMPT = """##任务
+_EXPAND_TEXT_PROMPT = f"""##任务
 
             请你根据用户的输入进行扩句，扩句长度至原长度的125%左右。优先保证语义，其次保证长度。
 
             ##输出
 
-            输出你根据任务所得的句子。
+            输出你根据任务所得的句子。{_FORMAT_PRESERVE_RULES}
 
             你只需要返回处理后的文本，严禁包含任何额外的解释、括号、统计信息或原句，只输出最终结果。
 
@@ -465,13 +522,13 @@ _EXPAND_TEXT_PROMPT = """##任务
 
             {{#sys.query#}}"""
 
-_CONTRACT_TEXT_PROMPT = """##任务
+_CONTRACT_TEXT_PROMPT = f"""##任务
 
             请你根据用户的输入进行缩句，缩句长度至原长度的80%左右。优先保证语义，其次保证长度。
 
             ##输出
 
-            输出你根据任务所得的句子。
+            输出你根据任务所得的句子。{_FORMAT_PRESERVE_RULES}
 
             你只需要返回处理后的文本，严禁包含任何额外的解释、括号、统计信息或原句，只输出最终结果。
 
@@ -640,8 +697,9 @@ def process_json_as_text(text: str, *, model: str = _DEFAULT_MODEL) -> str:
     return _call_siliconflow(_EVALUATE_RESUME_PROMPT, text, model, json_output=False)
 
 def generate_with_prompt(text: str, prompt: str, *, model: str = _DEFAULT_MODEL) -> str:
-    """Generates text using a dynamic prompt."""
-    return _call_siliconflow(prompt, text, model, json_output=False)
+    """Generates text using a dynamic prompt. We enforce format-preserving rules."""
+    merged_prompt = f"{_FORMAT_PRESERVE_RULES}\n\n{prompt}"
+    return _call_siliconflow(merged_prompt, text, model, json_output=False)
 
 def generate_statement(text: str, *, model: str = _DEFAULT_MODEL) -> Dict[str, Any]:
     """Generates a personal statement."""

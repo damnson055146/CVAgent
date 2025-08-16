@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import HTTPBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_, and_, func
 from app.database import get_db
 from app.models import user_models
 from app.models.schemas import UserCreate, UserLogin, Token, UserInDB
@@ -24,13 +25,18 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
 @router.post("/register", response_model=dict)
-def register(user: UserCreate, db: Session = Depends(get_db)):
+async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     """用户注册"""
     # 检查邮箱是否已存在
-    db_user = db.query(user_models.User).filter(
-        user_models.User.email == user.email,
-        user_models.User.deleted_at.is_(None)
-    ).first()
+    result = await db.execute(
+        select(user_models.User).where(
+            and_(
+                user_models.User.email == user.email,
+                user_models.User.deleted_at.is_(None)
+            )
+        )
+    )
+    db_user = result.scalars().first()
     
     if db_user:
         raise HTTPException(
@@ -40,10 +46,15 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     
     # 检查用户名是否已存在（如果提供了用户名）
     if user.username:
-        db_user = db.query(user_models.User).filter(
-            user_models.User.username == user.username,
-            user_models.User.deleted_at.is_(None)
-        ).first()
+        result = await db.execute(
+            select(user_models.User).where(
+                and_(
+                    user_models.User.username == user.username,
+                    user_models.User.deleted_at.is_(None)
+                )
+            )
+        )
+        db_user = result.scalars().first()
         
         if db_user:
             raise HTTPException(
@@ -62,26 +73,33 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     
     try:
         db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
+        await db.commit()
+        await db.refresh(db_user)
         return {"message": "User created successfully", "user_id": str(db_user.id)}
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create user"
         )
 
 @router.post("/login", response_model=Token)
-def login(user_credentials: UserLogin, response: Response, db: Session = Depends(get_db)):
+async def login(user_credentials: UserLogin, response: Response, db: AsyncSession = Depends(get_db)):
     """用户登录"""
     # 查找用户（支持邮箱或用户名登录）
-    db_user = db.query(user_models.User).filter(
-        (user_models.User.email == user_credentials.username) | 
-        (user_models.User.username == user_credentials.username),
-        user_models.User.deleted_at.is_(None),
-        user_models.User.is_active == True
-    ).first()
+    result = await db.execute(
+        select(user_models.User).where(
+            and_(
+                or_(
+                    user_models.User.email == user_credentials.username,
+                    user_models.User.username == user_credentials.username
+                ),
+                user_models.User.deleted_at.is_(None),
+                user_models.User.is_active == True
+            )
+        )
+    )
+    db_user = result.scalars().first()
     
     # 本地测试账号
     if not db_user and user_credentials.username == "testuser" and user_credentials.password == "testpassword":
@@ -101,8 +119,8 @@ def login(user_credentials: UserLogin, response: Response, db: Session = Depends
         )
     
     # 更新最后登录时间
-    db_user.last_login_at = user_models.func.now()
-    db.commit()
+    db_user.last_login_at = func.now()
+    await db.commit()
     
     # 创建访问令牌
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

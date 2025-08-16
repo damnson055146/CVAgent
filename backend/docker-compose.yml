@@ -3,7 +3,7 @@ version: "3.8"
 services:
   # PostgreSQL数据库
   postgres:
-    image: postgres:15
+    image: registry.cn-hangzhou.aliyuncs.com/mirrors_docker_library/postgres:15
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aiagent}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}

@@ -1,4 +1,4 @@
-FROM nginx:alpine
+FROM registry.cn-hangzhou.aliyuncs.com/mirrors_docker_library/nginx:alpine
 
 # 删除默认的nginx配置
 RUN rm /etc/nginx/conf.d/default.conf
