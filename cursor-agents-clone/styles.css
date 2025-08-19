@@ -1,0 +1,24 @@
+/* Tailwind base via CDN runtime config; only custom utility composites here */
+
+.feature-card { @apply rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:bg-white/10; }
+.feature-icon { @apply inline-flex h-10 w-10 items-center justify-center rounded-lg ring-1 ring-inset ring-white/15; }
+.feature-title { @apply mt-4 text-base font-semibold; }
+.feature-desc { @apply mt-1 text-sm text-white/70; }
+
+.agent-card { @apply relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:bg-white/10; }
+.agent-avatar { @apply h-10 w-10 rounded-lg ring-1 ring-inset ring-white/15; }
+.agent-title { @apply mt-3 text-base font-semibold; }
+.agent-tags { @apply mt-2 flex flex-wrap gap-2 text-[12px] text-white/70; }
+.agent-tags span { @apply rounded-md bg-black/30 px-2 py-0.5 ring-1 ring-inset ring-white/10; }
+
+.step-card { @apply relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-6; }
+.step-index { @apply absolute -top-3 right-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand-500/20 text-brand-200 ring-1 ring-inset ring-brand-400/40; }
+.step-title { @apply text-base font-semibold; }
+.step-desc { @apply mt-1 text-sm text-white/70; }
+
+.faq-item summary { @apply flex cursor-pointer items-center justify-between gap-4 py-4 text-sm text-white/80; }
+.faq-item[open] summary { @apply text-white; }
+.faq-item .content { @apply pb-4 text-sm text-white/70; }
+
+/* Hide default details marker */
+details > summary::-webkit-details-marker { display: none; }

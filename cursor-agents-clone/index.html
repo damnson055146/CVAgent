@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN" class="dark h-full scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cursor Agents - 复刻界面</title>
+    <meta name="description" content="复刻 Cursor Agents 页面界面 (前端静态版)" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.10/lib/index.min.js"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'],
+            },
+            colors: {
+              brand: {
+                50: '#eef4ff',
+                100: '#d9e6ff',
+                200: '#b5cdff',
+                300: '#8bb0ff',
+                400: '#5f90ff',
+                500: '#3b72ff',
+                600: '#2857db',
+                700: '#1f43ac',
+                800: '#1b3b8d',
+                900: '#182f6b',
+              },
+            },
+            backgroundImage: {
+              'grid': 'linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)',
+              'radial-spot': 'radial-gradient(800px 300px at 50% -50px, rgba(59,114,255,0.35), transparent)',
+              'glass-gradient': 'linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))',
+            },
+            boxShadow: {
+              glass: 'inset 0 1px 0 0 rgba(255,255,255,0.08)',
+              soft: '0 10px 30px rgba(0,0,0,0.25)',
+            },
+            keyframes: {
+              float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-6px)' } },
+              shimmer: { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } },
+            },
+            animation: {
+              float: 'float 6s ease-in-out infinite',
+              shimmer: 'shimmer 2.5s linear infinite',
+            },
+          },
+        },
+      }
+    </script>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="h-full bg-[#0b0f17] text-white antialiased selection:bg-brand-500/30 selection:text-white">
+    <div class="pointer-events-none fixed inset-0 bg-radial-spot"></div>
+    <div class="pointer-events-none fixed inset-0 bg-grid bg-[length:36px_36px] opacity-[0.08]"></div>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-[#0b0f17]/60 border-b border-white/5">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between">
+          <a href="#" class="flex items-center gap-2">
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
+              <i class="ti ti-rocket text-white text-xl"></i>
+            </span>
+            <span class="text-sm font-semibold tracking-wide text-white/90">Cursor Agents</span>
+          </a>
+          <nav class="hidden md:flex items-center gap-8 text-sm text-white/70">
+            <a href="#features" class="hover:text-white">功能</a>
+            <a href="#gallery" class="hover:text-white">Agent 画廊</a>
+            <a href="#how" class="hover:text-white">工作原理</a>
+            <a href="#faq" class="hover:text-white">FAQ</a>
+            <a href="#" class="hover:text-white">文档</a>
+          </nav>
+          <div class="flex items-center gap-2">
+            <button id="themeToggle" class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-white/70 hover:text-white">
+              <i class="ti ti-sun"></i>
+            </button>
+            <a href="#download" class="hidden sm:inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15">
+              <i class="ti ti-download"></i>
+              下载
+            </a>
+            <button id="mobileMenuBtn" class="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-white/70 hover:text-white">
+              <i class="ti ti-menu-2"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="mobileMenu" class="md:hidden hidden border-t border-white/5 bg-[#0b0f17]/80 backdrop-blur">
+        <div class="mx-auto max-w-7xl px-4 py-4 text-sm text-white/80 space-y-3">
+          <a href="#features" class="block">功能</a>
+          <a href="#gallery" class="block">Agent 画廊</a>
+          <a href="#how" class="block">工作原理</a>
+          <a href="#faq" class="block">FAQ</a>
+          <a href="#" class="block">文档</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section class="relative overflow-hidden">
+        <div class="absolute inset-0 opacity-80" aria-hidden="true">
+          <div class="pointer-events-none absolute -top-24 left-1/2 h-[700px] w-[1100px] -translate-x-1/2 rounded-full bg-[conic-gradient(from_220deg_at_50%_50%,#3b72ff_0deg,#8bb0ff_90deg,transparent_140deg)] blur-3xl"></div>
+        </div>
+        <div class="mx-auto max-w-7xl px-4 pb-16 pt-14 sm:pt-20 lg:pb-24 lg:pt-24">
+          <div class="mx-auto max-w-3xl text-center">
+            <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/80">
+              <span class="relative inline-flex h-2 w-2">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+              </span>
+              新一代 AI 开发工作流
+            </span>
+            <h1 class="mt-6 text-4xl font-extrabold tracking-tight sm:text-6xl">
+              构建、编排并运行你的 Agents
+            </h1>
+            <p class="mt-6 text-lg leading-8 text-white/70">
+              在一个统一的工作流中调度多个专精 Agent。无缝调用工具、协作编辑代码，并将复杂任务拆解为可复用的步骤。
+            </p>
+            <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <a href="#" class="inline-flex items-center gap-2 rounded-lg bg-white text-[#0b0f17] px-5 py-3 text-sm font-semibold shadow-soft hover:bg-white/90">
+                立即体验
+                <i class="ti ti-arrow-right"></i>
+              </a>
+              <a href="#how" class="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
+                查看工作原理
+              </a>
+            </div>
+          </div>
+
+          <!-- Code/Card Showcase -->
+          <div class="mt-14 grid gap-6 lg:grid-cols-2">
+            <div class="relative rounded-2xl border border-white/10 bg-glass-gradient p-5 shadow-glass">
+              <div class="absolute -top-3 left-6 inline-flex items-center gap-2 rounded-full border border-brand-400/40 bg-brand-500/10 px-3 py-1 text-xs text-brand-200">
+                <i class="ti ti-robot"></i>
+                Agent 配置
+              </div>
+              <pre class="mt-4 overflow-x-auto rounded-xl bg-black/60 p-4 text-[12.5px] leading-6 ring-1 ring-inset ring-white/10"><code class="text-white/90">{
+  "name": "code-reviewer",
+  "capabilities": ["read_repo", "run_tests", "comment_pr"],
+  "tools": [
+    { "type": "github", "scopes": ["repo:read", "pull_requests:write"] },
+    { "type": "terminal", "cwd": "./" }
+  ],
+  "policies": { "max_tokens": 8000, "allow_network": true }
+}</code></pre>
+            </div>
+
+            <div class="relative rounded-2xl border border-white/10 bg-glass-gradient p-5 shadow-glass">
+              <div class="absolute -top-3 left-6 inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+                <i class="ti ti-topology-star-3"></i>
+                工作流节点
+              </div>
+              <div class="grid grid-cols-3 gap-4">
+                <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div class="text-sm font-semibold">计划</div>
+                  <div class="mt-2 text-xs text-white/70">拆解任务 · 生成步骤</div>
+                </div>
+                <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div class="text-sm font-semibold">执行</div>
+                  <div class="mt-2 text-xs text-white/70">调用工具 · 写代码</div>
+                </div>
+                <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div class="text-sm font-semibold">评审</div>
+                  <div class="mt-2 text-xs text-white/70">运行测试 · 生成报告</div>
+                </div>
+              </div>
+              <div class="mt-4 rounded-xl border border-white/10 bg-black/50 p-4 text-sm">
+                <div class="flex items-center gap-2 text-emerald-300"><i class="ti ti-terminal-2"></i> 终端输出</div>
+                <pre class="mt-2 text-emerald-200/80">✔ tests/unit/utils.spec.ts passed (6)
+✔ tests/integration/api.spec.ts passed (12)
+✔ All checks successful</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section id="features" class="relative border-t border-white/5 py-20 lg:py-28">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div class="mx-auto max-w-2xl text-center">
+            <h2 class="text-3xl font-bold sm:text-4xl">为协作而生的 Agent 能力</h2>
+            <p class="mt-3 text-white/70">模块化、可组合、可审计，让复杂任务变得可控。</p>
+          </div>
+          <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <article class="feature-card">
+              <div class="feature-icon bg-brand-500/20 text-brand-200"><i class="ti ti-puzzle"></i></div>
+              <h3 class="feature-title">可组合</h3>
+              <p class="feature-desc">将多个专长 Agent 编排到单一工作流，按阶段协作完成任务。</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon bg-emerald-500/20 text-emerald-200"><i class="ti ti-arrows-shuffle"></i></div>
+              <h3 class="feature-title">工具接入</h3>
+              <p class="feature-desc">一键接入终端、浏览器、代码索引、GitHub、数据库等工具。</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon bg-fuchsia-500/20 text-fuchsia-200"><i class="ti ti-shield-lock"></i></div>
+              <h3 class="feature-title">安全可控</h3>
+              <p class="feature-desc">细粒度权限与审计日志，保证操作透明、可追溯。</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon bg-amber-500/20 text-amber-200"><i class="ti ti-topology-star"></i></div>
+              <h3 class="feature-title">可视化编排</h3>
+              <p class="feature-desc">拖拽创建节点、链接依赖，实时查看上下游输入输出。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Gallery -->
+      <section id="gallery" class="relative border-t border-white/5 py-20 lg:py-28">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div class="flex items-end justify-between gap-6">
+            <div>
+              <h2 class="text-3xl font-bold sm:text-4xl">Agent 画廊</h2>
+              <p class="mt-3 text-white/70">开箱即用的模板，快速落地。</p>
+            </div>
+            <a href="#" class="hidden sm:inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10">浏览更多 <i class="ti ti-arrow-right"></i></a>
+          </div>
+          <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="agent-card">
+              <div class="agent-avatar bg-gradient-to-br from-brand-500/50 to-fuchsia-500/40"></div>
+              <div class="agent-title">代码生成器</div>
+              <div class="agent-tags">
+                <span>TypeScript</span><span>React</span><span>测试优先</span>
+              </div>
+            </div>
+            <div class="agent-card">
+              <div class="agent-avatar bg-gradient-to-br from-emerald-500/50 to-cyan-500/40"></div>
+              <div class="agent-title">代码评审</div>
+              <div class="agent-tags">
+                <span>PR 审查</span><span>建议变更</span><span>风格检查</span>
+              </div>
+            </div>
+            <div class="agent-card">
+              <div class="agent-avatar bg-gradient-to-br from-amber-500/50 to-rose-500/40"></div>
+              <div class="agent-title">研究助理</div>
+              <div class="agent-tags">
+                <span>网页检索</span><span>笔记整理</span><span>引用导出</span>
+              </div>
+            </div>
+            <div class="agent-card">
+              <div class="agent-avatar bg-gradient-to-br from-indigo-500/50 to-violet-500/40"></div>
+              <div class="agent-title">数据分析</div>
+              <div class="agent-tags">
+                <span>SQL</span><span>可视化</span><span>报表</span>
+              </div>
+            </div>
+            <div class="agent-card">
+              <div class="agent-avatar bg-gradient-to-br from-cyan-500/50 to-sky-500/40"></div>
+              <div class="agent-title">DevOps 助理</div>
+              <div class="agent-tags">
+                <span>CI/CD</span><span>健康检查</span><span>回滚</span>
+              </div>
+            </div>
+            <div class="agent-card">
+              <div class="agent-avatar bg-gradient-to-br from-rose-500/50 to-fuchsia-500/40"></div>
+              <div class="agent-title">内容创作</div>
+              <div class="agent-tags">
+                <span>多语风格</span><span>长文结构</span><span>图片生成</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section id="how" class="relative border-t border-white/5 py-20 lg:py-28">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div class="mx-auto max-w-2xl text-center">
+            <h2 class="text-3xl font-bold sm:text-4xl">工作原理</h2>
+            <p class="mt-3 text-white/70">从目标到交付，仅需三步。</p>
+          </div>
+          <div class="mt-12 grid gap-6 lg:grid-cols-3">
+            <div class="step-card">
+              <div class="step-index">1</div>
+              <h3 class="step-title">定义目标</h3>
+              <p class="step-desc">用自然语言描述任务，选择合适的 Agent 模板。</p>
+            </div>
+            <div class="step-card">
+              <div class="step-index">2</div>
+              <h3 class="step-title">编排流程</h3>
+              <p class="step-desc">拖拽连接节点，设置工具与权限，预览输入输出。</p>
+            </div>
+            <div class="step-card">
+              <div class="step-index">3</div>
+              <h3 class="step-title">一键运行</h3>
+              <p class="step-desc">并行执行各 Agent，自动同步上下文并产出结果。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq" class="relative border-t border-white/5 py-20 lg:py-28">
+        <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <h2 class="text-3xl font-bold sm:text-4xl">常见问题</h2>
+          <div class="mt-8 divide-y divide-white/10">
+            <details class="group faq-item">
+              <summary>
+                <span>是否支持离线/本地模型？</span>
+                <i class="ti ti-chevron-down"></i>
+              </summary>
+              <div class="content">支持通过本地推理服务或 API 网关接入，包括多模型路由与回退策略。</div>
+            </details>
+            <details class="group faq-item">
+              <summary>
+                <span>如何限制危险操作？</span>
+                <i class="ti ti-chevron-down"></i>
+              </summary>
+              <div class="content">通过权限清单、沙箱执行和审计日志实现可控边界，关键操作需显式批准。</div>
+            </details>
+            <details class="group faq-item">
+              <summary>
+                <span>能否与现有 CI/CD 集成？</span>
+                <i class="ti ti-chevron-down"></i>
+              </summary>
+              <div class="content">提供 CLI 与 Webhook，支持 GitHub Actions、GitLab CI、Jenkins 等。</div>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="relative border-t border-white/5 py-10">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-2 text-white/70">
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/10">
+              <i class="ti ti-rocket text-white text-xl"></i>
+            </span>
+            <span class="text-sm">Cursor Agents · 前端复刻</span>
+          </div>
+          <div class="text-xs text-white/50">本页面仅用于学习与演示 UI，非官方站点。</div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="./script.js"></script>
+  </body>
+  </html>
+
